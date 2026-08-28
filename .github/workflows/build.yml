@@ -1,0 +1,138 @@
+name: Build desktop apps
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install app
+        run: python -m pip install .
+
+      - name: Run model and headless GUI tests
+        run: python -m unittest discover -s tests -v
+
+  build:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            artifact: FloorPlanner-Windows-x64
+            archive: FloorPlanner-Windows-x64.zip
+          - os: macos-15
+            artifact: FloorPlanner-macOS-arm64
+            archive: FloorPlanner-macOS-arm64.zip
+          - os: macos-15-intel
+            artifact: FloorPlanner-macOS-x64
+            archive: FloorPlanner-macOS-x64.zip
+          - os: ubuntu-22.04
+            artifact: FloorPlanner-Linux-x64
+            archive: FloorPlanner-Linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install app and packager
+        run: python -m pip install . pyinstaller==6.22.2
+
+      - name: Run model tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build desktop package
+        run: >-
+          pyinstaller
+          --noconfirm
+          --clean
+          --windowed
+          --name FloorPlanner
+          --collect-all pypdfium2
+          run_floor_planner.py
+
+      - name: Smoke-test Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: dist/FloorPlanner/FloorPlanner.exe --smoke-test
+
+      - name: Smoke-test macOS package
+        if: runner.os == 'macOS'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: dist/FloorPlanner.app/Contents/MacOS/FloorPlanner --smoke-test
+
+      - name: Smoke-test Linux package
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: dist/FloorPlanner/FloorPlanner --smoke-test
+
+      - name: Package Windows build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/FloorPlanner -DestinationPath '${{ matrix.archive }}'
+
+      - name: Package macOS build
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent dist/FloorPlanner.app '${{ matrix.archive }}'
+
+      - name: Package Linux build
+        if: runner.os == 'Linux'
+        run: tar -C dist -czf '${{ matrix.archive }}' FloorPlanner
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: FloorPlanner-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* --generate-notes --verify-tag
+          fi

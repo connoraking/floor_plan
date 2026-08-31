@@ -9,7 +9,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     import pypdfium2  # noqa: F401
     from PIL import Image
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QDialog, QFileDialog
 
     GUI_DEPENDENCIES_AVAILABLE = True
 except ImportError:
@@ -30,6 +32,68 @@ class GuiSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_start_screen_buttons_open_a_pdf_and_never_look_inert(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pdf_path = Path(directory) / "clickable plan.pdf"
+            Image.new("RGB", (640, 480), "white").save(pdf_path, "PDF", resolution=72.0)
+
+            window = MainWindow()
+            window.show()
+            self.app.processEvents()
+            self.assertTrue(window.start_panel.isVisible())
+            self.assertTrue(window.open_pdf_action.isEnabled())
+            self.assertTrue(window.calibrate_action.isEnabled())
+            self.assertTrue(window.add_rectangle_action.isEnabled())
+            self.assertTrue(window.add_l_shape_action.isEnabled())
+
+            with patch(
+                "floor_planner.main_window.QFileDialog.getOpenFileName",
+                return_value=(str(pdf_path), "PDF floor plans (*.pdf)"),
+            ) as picker:
+                QTest.mouseClick(window.choose_pdf_button, Qt.MouseButton.LeftButton)
+                self.app.processEvents()
+
+            self.assertEqual(window.pdf_path, str(pdf_path))
+            self.assertFalse(window.start_panel.isVisible())
+            self.assertTrue(window.calibrate_action.isEnabled())
+            self.assertTrue(window.add_rectangle_action.isEnabled())
+            window.calibrate_action.trigger()
+            self.assertEqual(window.view.mode, "calibrate")
+            window.view.set_mode("select")
+
+            window.project.calibrations[0] = Calibration(20, 20, 220, 20, 120)
+            window._update_ui_state()
+            with patch("floor_planner.main_window.FurnitureDialog") as dialog_type:
+                dialog = dialog_type.return_value
+                dialog.exec.return_value = QDialog.DialogCode.Accepted
+                dialog.values.return_value = (
+                    "Test sofa",
+                    ShapeSpec("rectangle", 84, 36),
+                    "#2F80ED",
+                )
+                window.add_rectangle_action.trigger()
+            self.assertEqual(len(window.project.furniture), 1)
+            self.assertEqual(window.project.furniture[0].name, "Test sofa")
+            self.assertEqual(
+                picker.call_args.kwargs["options"],
+                QFileDialog.Option.DontUseNativeDialog,
+            )
+
+            window._close_document_resources()
+            window.deleteLater()
+
+    def test_startup_workflow_actions_explain_their_prerequisites(self) -> None:
+        window = MainWindow()
+        with patch("floor_planner.main_window.QMessageBox.information") as message:
+            window.calibrate_action.trigger()
+            window.add_rectangle_action.trigger()
+            window.add_l_shape_action.trigger()
+        self.assertEqual(message.call_count, 3)
+        self.assertTrue(
+            all(call.args[1] == "Open a PDF first" for call in message.call_args_list)
+        )
+        window.deleteLater()
 
     def test_pdf_coordinates_and_furniture_scale(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

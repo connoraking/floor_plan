@@ -7,5 +7,5 @@ __pycache__/
 build/
 dist/
 *.spec
+!packaging/FloorPlanner.spec
 .DS_Store
-

@@ -88,13 +88,13 @@ Versioned packages appear on the repository's **Releases** page:
 | Computer | Release archive | What to open after extracting |
 |---|---|---|
 | Windows 10/11, Intel or AMD 64-bit | `FloorPlanner-Windows-x64.zip` | `FloorPlanner/FloorPlanner.exe` |
-| Mac with Apple silicon | `FloorPlanner-macOS-arm64.zip` | `FloorPlanner.app` |
-| Mac with an Intel processor | `FloorPlanner-macOS-x64.zip` | `FloorPlanner.app` |
+| Mac with Apple silicon, macOS 13+ | `FloorPlanner-macOS-arm64.zip` | `FloorPlanner/FloorPlanner.app` |
+| Mac with an Intel processor, macOS 13+ | `FloorPlanner-macOS-x64.zip` | `FloorPlanner/FloorPlanner.app` |
 | Ubuntu 22.04+ or compatible Linux, x64 | `FloorPlanner-Linux-x64.tar.gz` | `FloorPlanner/FloorPlanner` |
 
 Extract the entire archive; the executable needs the support files beside it. No Python setup is required.
 
-For the repository owner: pushing a version tag such as `v0.1.0` runs the included GitHub Actions workflow and publishes all four archives as a GitHub Release. The workflow can also be run manually from the Actions tab to create temporary test artifacts.
+For the repository owner: pushing a version tag such as `v0.1.0` runs the included GitHub Actions workflow and publishes all four archives as a GitHub Release. Exact Qt/PySide corresponding-source archives are attached to the same release. The workflow can also be run manually from the Actions tab to create temporary test artifacts.
 
 These community builds are unsigned. For a build you trust, Windows may require **More info → Run anyway**. On macOS, Control-click the app and choose **Open**, or approve it under **System Settings → Privacy & Security**. Code signing can remove these warnings later.
 
@@ -123,4 +123,4 @@ The first version intentionally uses guided rectangle and L-shape editors instea
 
 ## License
 
-MIT
+Floor Planner is MIT licensed. Downloadable builds also include `THIRD_PARTY_NOTICES.md` and the license texts for Qt/PySide6, PDFium, Pillow, Python, and the PyInstaller bootloader.

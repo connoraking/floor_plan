@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import math
 import sys
+import tempfile
+import traceback
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -84,6 +86,7 @@ class MainWindow(QMainWindow):
         self.pdf_path: str | None = None
         self.project_path: str | None = None
         self.loaded_bundle: LoadedProject | None = None
+        self.last_directory = str(Path.home())
         self.background_item: QGraphicsPixmapItem | None = None
         self.calibration_line_item: QGraphicsLineItem | None = None
         self.calibration_label_item: QGraphicsSimpleTextItem | None = None
@@ -298,11 +301,29 @@ class MainWindow(QMainWindow):
         self.banner.setWordWrap(True)
         self.banner.setContentsMargins(14, 10, 14, 10)
 
+        self.start_panel = QWidget()
+        self.start_panel.setObjectName("startPanel")
+        start_layout = QHBoxLayout(self.start_panel)
+        start_layout.setContentsMargins(18, 14, 18, 14)
+        start_message = QLabel(
+            "Start by choosing the PDF floor plan on this computer. You can also drag it onto the gray area below."
+        )
+        start_message.setWordWrap(True)
+        self.choose_pdf_button = QPushButton("Choose a PDF…")
+        self.choose_pdf_button.setObjectName("primaryButton")
+        self.choose_pdf_button.clicked.connect(self.open_pdf)
+        self.choose_project_button = QPushButton("Open a saved project…")
+        self.choose_project_button.clicked.connect(self.open_project)
+        start_layout.addWidget(start_message, 1)
+        start_layout.addWidget(self.choose_pdf_button)
+        start_layout.addWidget(self.choose_project_button)
+
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.banner)
+        layout.addWidget(self.start_panel)
         layout.addWidget(self.view, 1)
         self.setCentralWidget(central)
 
@@ -387,9 +408,14 @@ class MainWindow(QMainWindow):
 
     def open_pdf(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open a floor plan", "", "PDF floor plans (*.pdf);;All files (*)"
+            self,
+            "Open a floor plan",
+            self.last_directory,
+            "PDF floor plans (*.pdf *.PDF);;All files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            self.last_directory = str(Path(path).parent)
             self._load_pdf_path(path)
 
     def _load_pdf_path(self, path: str) -> None:
@@ -398,11 +424,17 @@ class MainWindow(QMainWindow):
         project = Project(
             pdf_name=Path(path).name, display_unit=self.project.display_unit
         )
+        self.statusBar().showMessage(f"Opening {Path(path).name}…")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        QApplication.processEvents()
         try:
             document, rendered = self._prepare_document(path, 0)
         except Exception as exc:  # noqa: BLE001 - PDFium exposes backend-specific errors.
+            QApplication.restoreOverrideCursor()
             self._show_error("Could not open PDF", self._friendly_pdf_error(exc))
+            self.statusBar().showMessage("The PDF could not be opened.", 7000)
             return
+        QApplication.restoreOverrideCursor()
         self._replace_document(document, path, project, rendered, None, None)
         self.statusBar().showMessage(
             "PDF opened. Draw a line to calibrate its scale.", 7000
@@ -412,10 +444,12 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open a Floor Planner project",
-            "",
+            self.last_directory,
             "Floor Planner projects (*.floorplan)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            self.last_directory = str(Path(path).parent)
             self._load_project_path(path)
 
     def _load_project_path(self, path: str) -> None:
@@ -999,12 +1033,17 @@ class MainWindow(QMainWindow):
             return False
         path = None if save_as else self.project_path
         if not path:
-            suggested = str(Path(self.project.pdf_name).with_suffix(".floorplan"))
+            suggested = str(
+                Path(self.project_path)
+                if self.project_path
+                else Path(self.pdf_path).with_suffix(".floorplan")
+            )
             path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Floor Planner project",
                 suggested,
                 "Floor Planner projects (*.floorplan)",
+                options=QFileDialog.Option.DontUseNativeDialog,
             )
             if not path:
                 return False
@@ -1029,9 +1068,21 @@ class MainWindow(QMainWindow):
                 self, "Nothing to export", "Open a PDF floor plan first."
             )
             return
-        suggested = f"{Path(self.project.pdf_name).stem}-layout-page-{self.project.current_page + 1}.png"
+        output_directory = (
+            Path(self.project_path).parent
+            if self.project_path
+            else Path(self.pdf_path).parent
+        )
+        suggested = str(
+            output_directory
+            / f"{Path(self.project.pdf_name).stem}-layout-page-{self.project.current_page + 1}.png"
+        )
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export furniture layout", suggested, "PNG images (*.png)"
+            self,
+            "Export furniture layout",
+            suggested,
+            "PNG images (*.png)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if not path:
             return
@@ -1116,6 +1167,7 @@ class MainWindow(QMainWindow):
     def _update_ui_state(self) -> None:
         has_document = self.pdf_document is not None
         has_scale = self.project.current_page in self.project.calibrations
+        self.start_panel.setVisible(not has_document)
         self.page_spin.setEnabled(
             has_document and len(self.pdf_document) > 1 if has_document else False
         )
@@ -1123,9 +1175,11 @@ class MainWindow(QMainWindow):
         self.save_action.setEnabled(has_document)
         self.save_as_action.setEnabled(has_document)
         self.export_action.setEnabled(has_document)
-        self.calibrate_action.setEnabled(has_document)
-        self.add_rectangle_action.setEnabled(has_document)
-        self.add_l_shape_action.setEnabled(has_document)
+        # Keep the main workflow buttons clickable at startup. Their handlers
+        # explain the missing prerequisite instead of appearing broken.
+        self.calibrate_action.setEnabled(True)
+        self.add_rectangle_action.setEnabled(True)
+        self.add_l_shape_action.setEnabled(True)
         self.fit_action.setEnabled(has_document)
 
         if not has_document:
@@ -1168,11 +1222,22 @@ class MainWindow(QMainWindow):
         self.rotate_left_action.setEnabled(enabled)
         self.rotate_right_action.setEnabled(enabled)
         if not selected:
-            self.inspector_name.setText("Nothing selected")
-            self.inspector_details.setText(
-                "Click a furniture piece to see its size and editing controls. "
-                "Double-click a piece to change its exact dimensions."
-            )
+            if self.pdf_document is None:
+                self.inspector_name.setText("Get started")
+                self.inspector_details.setText(
+                    "Choose a PDF floor plan, then calibrate one known distance before adding furniture."
+                )
+            elif self.project.current_page not in self.project.calibrations:
+                self.inspector_name.setText("Set the scale")
+                self.inspector_details.setText(
+                    "Click Calibrate Scale and draw over a known wall length or printed dimension."
+                )
+            else:
+                self.inspector_name.setText("Nothing selected")
+                self.inspector_details.setText(
+                    "Click a furniture piece to see its size and editing controls. "
+                    "Double-click a piece to change its exact dimensions."
+                )
             self.lock_button.setText("Lock")
             return
         if len(selected) > 1:
@@ -1250,7 +1315,9 @@ class MainWindow(QMainWindow):
             "About Floor Planner",
             "<h3>Floor Planner 0.1</h3>"
             "<p>Place true-to-size furniture over a PDF floor plan.</p>"
-            "<p>Your PDFs and projects remain local on your computer.</p>",
+            "<p>Your PDFs and projects remain local on your computer.</p>"
+            "<p>Built with the open-source Qt/PySide6, PDFium, and Pillow libraries. "
+            "Release packages include their license notices and corresponding-source information.</p>",
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:
@@ -1270,6 +1337,9 @@ QToolButton:checked { background: #DCE9FF; color: #174EA6; }
 QPushButton { padding: 7px 10px; border: 1px solid #B8C1CC; border-radius: 5px; background: white; }
 QPushButton:hover { background: #F0F4F8; }
 QPushButton:disabled { color: #98A2B3; background: #F2F4F7; }
+QWidget#startPanel { background: #FFFFFF; border-bottom: 1px solid #D0D5DD; }
+QPushButton#primaryButton { background: #1769E0; color: white; border-color: #1769E0; font-weight: 600; }
+QPushButton#primaryButton:hover { background: #1257BC; }
 QPushButton#deleteButton { color: #B42318; }
 QLineEdit, QComboBox, QDoubleSpinBox, QSpinBox { padding: 5px; border: 1px solid #B8C1CC; border-radius: 4px; background: white; }
 QDockWidget { font-weight: 600; }
@@ -1285,8 +1355,59 @@ def run() -> int:
     app.setOrganizationName("Floor Planner")
     app.setStyle("Fusion")
     app.setStyleSheet(APP_STYLESHEET)
+
+    def show_unhandled_error(exc_type, exc_value, exc_traceback) -> None:  # type: ignore[no-untyped-def]
+        details = "".join(
+            traceback.format_exception(exc_type, exc_value, exc_traceback)
+        )
+        if sys.__stderr__ is not None:
+            sys.__stderr__.write(details)
+        QMessageBox.critical(
+            None,
+            "Floor Planner encountered an error",
+            f"{exc_type.__name__}: {exc_value}\n\n"
+            "Please copy this message when reporting the problem. The app will remain open.",
+        )
+
+    sys.excepthook = show_unhandled_error
     window = MainWindow()
     window.show()
     if smoke_test:
-        QTimer.singleShot(250, app.quit)
+
+        def run_smoke_test() -> None:
+            try:
+                from PIL import Image
+
+                if not window.choose_pdf_button.isEnabled():
+                    raise RuntimeError("The start-screen PDF button is disabled.")
+                with tempfile.TemporaryDirectory() as directory:
+                    pdf_path = Path(directory) / "smoke-test.pdf"
+                    Image.new("RGB", (320, 240), "white").save(
+                        pdf_path, "PDF", resolution=72.0
+                    )
+                    document, rendered = window._prepare_document(str(pdf_path), 0)
+                    window._replace_document(
+                        document,
+                        str(pdf_path),
+                        Project(pdf_name=pdf_path.name),
+                        rendered,
+                        None,
+                        None,
+                    )
+                    if (
+                        window.pdf_document is None
+                        or not window.calibrate_action.isEnabled()
+                    ):
+                        raise RuntimeError(
+                            "A PDF loaded but the workflow did not activate."
+                        )
+                    window._close_document_resources()
+            except Exception:  # noqa: BLE001 - smoke test must convert every failure to an exit code.
+                if sys.__stderr__ is not None:
+                    traceback.print_exc(file=sys.__stderr__)
+                app.exit(1)
+                return
+            app.exit(0)
+
+        QTimer.singleShot(0, run_smoke_test)
     return app.exec()

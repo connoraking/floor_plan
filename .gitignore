@@ -6,6 +6,11 @@ __pycache__/
 .coverage
 build/
 dist/
+dist-web/
+release/
+node_modules/
+npm-debug.log*
+tmp/
 *.spec
 !packaging/FloorPlanner.spec
 .DS_Store

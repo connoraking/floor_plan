@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101828" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'" />
+    <title>Floor Planner</title>
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Floor Planner">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div>
+            <strong>Floor Planner</strong>
+            <small>See what fits before you move it</small>
+          </div>
+        </div>
+
+        <nav class="top-actions" aria-label="File controls">
+          <button id="open-pdf" class="button button-primary" type="button">
+            <span aria-hidden="true">＋</span> Open PDF
+          </button>
+          <button id="open-project" class="button button-dark" type="button">Open project</button>
+          <button id="save-project" class="button button-dark" type="button" disabled>Save</button>
+          <button id="export-png" class="button button-dark" type="button" disabled>Export page</button>
+        </nav>
+
+        <div class="zoom-controls" aria-label="Zoom controls">
+          <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out">−</button>
+          <output id="zoom-value" aria-live="polite">100%</output>
+          <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in">＋</button>
+          <button id="zoom-fit" class="button button-small button-dark" type="button">Fit</button>
+        </div>
+      </header>
+
+      <main class="main-layout">
+        <aside class="workflow-panel" aria-label="Floor planning workflow">
+          <section class="intro-card">
+            <p class="eyebrow">THREE EASY STEPS</p>
+            <h1>Plan your room</h1>
+            <p>Everything stays on this computer. Your floor plan is never uploaded.</p>
+          </section>
+
+          <ol class="steps">
+            <li class="step is-current" id="step-open">
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <h2>Open your floor plan</h2>
+                <p>Choose a PDF or drop it onto the middle of the window.</p>
+                <button id="open-pdf-side" class="button button-primary button-wide" type="button">Choose PDF</button>
+                <p id="pdf-summary" class="step-status" aria-live="polite">No PDF open</p>
+              </div>
+            </li>
+
+            <li class="step" id="step-calibrate">
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <h2>Set the scale</h2>
+                <p>Click two ends of a printed measurement, then type its real length.</p>
+                <button id="calibrate" class="button button-accent button-wide" type="button" aria-pressed="false" disabled>
+                  Calibrate this page
+                </button>
+                <p id="scale-summary" class="step-status" aria-live="polite">Open a PDF first</p>
+              </div>
+            </li>
+
+            <li class="step" id="step-furniture">
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <h2>Add furniture</h2>
+                <p>Use exact dimensions. Drag each piece into place.</p>
+                <div class="shape-buttons">
+                  <button id="add-rectangle" class="shape-button" type="button" disabled>
+                    <span class="shape-preview rectangle-preview" aria-hidden="true"></span>
+                    Rectangle
+                  </button>
+                  <button id="add-l-shape" class="shape-button" type="button" disabled>
+                    <span class="shape-preview l-preview" aria-hidden="true"></span>
+                    L-shape
+                  </button>
+                </div>
+                <div class="preset-row" aria-label="Furniture shortcuts">
+                  <button class="text-button preset" data-preset="sofa" type="button" disabled>Sofa</button>
+                  <button class="text-button preset" data-preset="queen" type="button" disabled>Queen bed</button>
+                  <button class="text-button preset" data-preset="table" type="button" disabled>Dining table</button>
+                </div>
+              </div>
+            </li>
+          </ol>
+
+          <details class="help-card">
+            <summary>Quick help</summary>
+            <ul>
+              <li>Click a page before calibrating or adding furniture.</li>
+              <li>Drag furniture to move it. Arrow keys make small adjustments.</li>
+              <li>Use Delete to remove the selected piece.</li>
+            </ul>
+          </details>
+        </aside>
+
+        <section class="workspace" aria-label="Floor plan workspace">
+          <div id="workspace-toolbar" class="workspace-toolbar">
+          <div>
+            <strong id="document-name">No floor plan open</strong>
+            <span id="page-count"></span>
+            <span id="active-page-status" class="sr-only" aria-live="polite"></span>
+            </div>
+            <label class="layout-control">
+              Page layout
+              <select id="page-layout">
+                <option value="continuous">Continuous</option>
+                <option value="spread">Two-page view</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="drop-zone" class="drop-zone">
+            <div class="empty-state">
+              <div class="empty-icon" aria-hidden="true">PDF</div>
+              <h2>Drop a floor plan PDF here</h2>
+              <p>or choose one from your computer</p>
+              <button id="empty-open" class="button button-primary button-large" type="button">Choose a PDF</button>
+              <small>Multi-page PDFs are shown together.</small>
+            </div>
+          </div>
+
+          <div id="page-gallery" class="page-gallery" hidden></div>
+
+          <div id="calibration-guide" class="calibration-guide" role="status" aria-live="polite" aria-atomic="true" hidden>
+            <div>
+              <strong id="calibration-guide-title">Click the first endpoint</strong>
+              <span id="calibration-guide-detail">Choose one end of a printed dimension line.</span>
+            </div>
+            <button id="cancel-calibration" class="button button-light button-small" type="button">Cancel</button>
+          </div>
+        </section>
+
+        <aside id="inspector" class="inspector" aria-label="Furniture details">
+          <div id="inspector-empty" class="inspector-empty">
+            <div class="selection-icon" aria-hidden="true">↖</div>
+            <h2>Select furniture</h2>
+            <p>Click a furniture shape to edit its dimensions, color, angle, or name.</p>
+          </div>
+
+          <form id="inspector-form" hidden>
+            <div class="inspector-heading">
+              <div>
+                <p class="eyebrow">SELECTED PIECE</p>
+                <h2 id="inspector-title">Furniture</h2>
+              </div>
+              <button id="close-inspector" class="icon-button icon-button-light" type="button" aria-label="Deselect furniture">×</button>
+            </div>
+
+            <label>
+              Name
+              <input id="edit-name" name="name" type="text" maxlength="60" />
+            </label>
+            <div class="field-row">
+              <label>
+                Width (in)
+                <input id="edit-width" name="width" type="number" min="1" step="0.25" />
+              </label>
+              <label>
+                Depth (in)
+                <input id="edit-depth" name="depth" type="number" min="1" step="0.25" />
+              </label>
+            </div>
+            <div id="l-shape-fields" class="field-row" hidden>
+              <label>
+                Arm depth (in)
+                <input id="edit-arm-depth" name="armDepth" type="number" min="1" step="0.25" />
+              </label>
+              <label>
+                Return width (in)
+                <input id="edit-return-width" name="returnWidth" type="number" min="1" step="0.25" />
+              </label>
+            </div>
+            <label>
+              Angle
+              <div class="angle-control">
+                <button id="rotate-left" class="button button-secondary" type="button">↶ 15°</button>
+                <input id="edit-rotation" name="rotation" type="number" step="1" />
+                <button id="rotate-right" class="button button-secondary" type="button">15° ↷</button>
+              </div>
+            </label>
+            <label>
+              Color
+              <div class="color-row" id="color-row">
+                <button type="button" class="color-swatch" data-color="#2563eb" style="--swatch: #2563eb" aria-label="Blue" aria-pressed="false"></button>
+                <button type="button" class="color-swatch" data-color="#db2777" style="--swatch: #db2777" aria-label="Pink" aria-pressed="false"></button>
+                <button type="button" class="color-swatch" data-color="#059669" style="--swatch: #059669" aria-label="Green" aria-pressed="false"></button>
+                <button type="button" class="color-swatch" data-color="#d97706" style="--swatch: #d97706" aria-label="Orange" aria-pressed="false"></button>
+                <button type="button" class="color-swatch" data-color="#7c3aed" style="--swatch: #7c3aed" aria-label="Purple" aria-pressed="false"></button>
+              </div>
+            </label>
+            <label class="checkbox-label">
+              <input id="edit-locked" name="locked" type="checkbox" />
+              Lock this piece in place
+            </label>
+            <div class="inspector-actions">
+              <button id="duplicate" class="button button-secondary" type="button">Duplicate</button>
+              <button id="delete" class="button button-danger" type="button">Delete</button>
+            </div>
+          </form>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="calibration-dialog" class="modal" aria-labelledby="calibration-dialog-title" aria-describedby="calibration-dialog-description">
+      <form id="calibration-form" method="dialog">
+        <div class="modal-heading">
+          <span class="modal-icon" aria-hidden="true">↔</span>
+          <div>
+            <p class="eyebrow">LAST STEP</p>
+            <h2 id="calibration-dialog-title">What is that distance?</h2>
+          </div>
+        </div>
+        <p id="calibration-dialog-description">Type the real measurement between the two points you clicked.</p>
+        <div class="measure-row">
+          <label>
+            Length
+            <input id="calibration-length" type="number" min="0.01" step="any" value="10" required autofocus />
+          </label>
+          <label>
+            Unit
+            <select id="calibration-unit">
+              <option value="ft" selected>feet</option>
+              <option value="in">inches</option>
+              <option value="cm">centimeters</option>
+              <option value="m">meters</option>
+            </select>
+          </label>
+        </div>
+        <label class="checkbox-label">
+          <input id="calibration-all-pages" type="checkbox" />
+          Use this scale for every page (only when all pages have the same printed scale)
+        </label>
+        <div class="modal-actions">
+          <button id="calibration-cancel" class="button button-secondary" type="button">Cancel</button>
+          <button id="calibration-back" class="button button-secondary" type="button">Choose points again</button>
+          <button class="button button-primary" type="submit">Set scale</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="furniture-dialog" class="modal" aria-labelledby="furniture-dialog-title" aria-describedby="furniture-shape-help">
+      <form id="furniture-form" method="dialog">
+        <div class="modal-heading">
+          <span class="modal-icon furniture-modal-icon" aria-hidden="true">▰</span>
+          <div>
+            <p class="eyebrow">ADD FURNITURE</p>
+            <h2 id="furniture-dialog-title">Add rectangle</h2>
+          </div>
+        </div>
+        <label>
+          Name
+          <input id="furniture-name" type="text" maxlength="60" value="Sofa" required />
+        </label>
+        <div class="field-row">
+          <label>
+            Width (inches)
+            <input id="furniture-width" type="number" min="1" step="0.25" value="84" required />
+          </label>
+          <label>
+            Depth (inches)
+            <input id="furniture-depth" type="number" min="1" step="0.25" value="36" required />
+          </label>
+        </div>
+        <div id="new-l-shape-fields" class="field-row" hidden>
+          <label>
+            Arm depth (inches)
+            <input id="furniture-arm-depth" type="number" min="1" step="0.25" value="36" />
+          </label>
+          <label>
+            Return width (inches)
+            <input id="furniture-return-width" type="number" min="1" step="0.25" value="36" />
+          </label>
+        </div>
+        <p id="furniture-shape-help" class="form-help">A regular rectangle, good for beds, tables, rugs, and sofas.</p>
+        <div class="modal-actions">
+          <button id="furniture-cancel" class="button button-secondary" type="button">Cancel</button>
+          <button class="button button-primary" type="submit">Add to page</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input id="pdf-file-input" type="file" accept="application/pdf,.pdf" hidden />
+    <input id="project-file-input" type="file" accept=".floorplan,application/json" hidden />
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

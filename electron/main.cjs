@@ -71,6 +71,46 @@ async function runSmokeTest(window) {
         document.getElementById("furniture-depth").value = "36";
         document.getElementById("furniture-form").requestSubmit();
 
+        const resizeHandlesBefore = document.querySelectorAll(".resize-handle").length;
+        const widthHandle = document.querySelector('.resize-handle[data-resize-axis="width"]');
+        const widthHandleBounds = widthHandle.getBoundingClientRect();
+        const resizeStartX = (widthHandleBounds.left + widthHandleBounds.right) / 2;
+        const resizeStartY = (widthHandleBounds.top + widthHandleBounds.bottom) / 2;
+        widthHandle.dispatchEvent(new PointerEvent("pointerdown", {
+          bubbles: true,
+          clientX: resizeStartX,
+          clientY: resizeStartY,
+          pointerId: 21,
+          button: 0,
+        }));
+        svg.dispatchEvent(new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: resizeStartX + 40,
+          clientY: resizeStartY,
+          pointerId: 21,
+          button: 0,
+        }));
+        svg.dispatchEvent(new PointerEvent("pointerup", {
+          bubbles: true,
+          clientX: resizeStartX + 40,
+          clientY: resizeStartY,
+          pointerId: 21,
+          button: 0,
+        }));
+        const resizedFurnitureWidth = window.__floorPlannerTest.getState().items[0].width;
+
+        zoomSlider.value = "200";
+        zoomSlider.dispatchEvent(new Event("input", { bubbles: true }));
+        const calibrationPointScreenSize = document.querySelector(".calibration-point").getBoundingClientRect().width;
+        document.getElementById("zoom-fit").click();
+
+        const mainLayoutColumns = getComputedStyle(document.querySelector(".main-layout")).gridTemplateColumns.split(" ").length;
+        const inspectorPosition = getComputedStyle(document.getElementById("inspector")).position;
+        const galleryBounds = continuousGallery.getBoundingClientRect();
+        const inspectorBounds = document.getElementById("inspector").getBoundingClientRect();
+        const galleryStaysLeftOfInspector = galleryBounds.right <= inspectorBounds.left + 1;
+        const scrollbarGutter = getComputedStyle(continuousGallery).scrollbarGutter;
+
         const exportedPdf = await window.__floorPlannerTest.createExportPdfBytes();
         const state = window.__floorPlannerTest.getState();
         const gallery = document.getElementById("page-gallery");
@@ -81,6 +121,13 @@ async function runSmokeTest(window) {
           continuousPageFillsWidth,
           exportedPdfPrefix: String.fromCharCode(...exportedPdf.slice(0, 5)),
           exportedPdfSize: exportedPdf.length,
+          resizeHandlesBefore,
+          resizedFurnitureWidth,
+          calibrationPointScreenSize,
+          mainLayoutColumns,
+          inspectorPosition,
+          galleryStaysLeftOfInspector,
+          scrollbarGutter,
           zoomAfterSlider,
           visiblePageCards: [...document.querySelectorAll(".page-card")].filter((node) => !node.hidden).length,
           openButtonColor: getComputedStyle(document.getElementById("open-pdf")).backgroundColor,
@@ -101,6 +148,12 @@ async function runSmokeTest(window) {
     if (result.pdfPageNumbers.join(",") !== "1,2,4,5") failures.push("the wrong PDF page was removed");
     if (result.calibratedPages !== 4) failures.push("calibration was not applied to all remaining pages");
     if (result.itemCount !== 1) failures.push("furniture could not be added");
+    if (result.resizeHandlesBefore !== 3 || result.resizedFurnitureWidth <= 84) failures.push("direct furniture resize handles did not work");
+    if (result.calibrationPointScreenSize > 12) failures.push("calibration points grew too large when zoomed");
+    if (result.mainLayoutColumns !== 3 || result.inspectorPosition === "absolute" || !result.galleryStaysLeftOfInspector) {
+      failures.push("the furniture inspector overlays the PDF workspace");
+    }
+    if (!result.scrollbarGutter.includes("stable")) failures.push("the PDF scrollbar does not reserve its own gutter");
     if (result.exportedPdfPrefix !== "%PDF-" || result.exportedPdfSize < 1000) failures.push("furnished PDF export failed");
     if (result.layout !== "spread") failures.push("two-page layout did not activate");
     if (result.zoomAfterSlider !== 1.4) failures.push("zoom slider did not set an exact zoom level");
@@ -124,7 +177,7 @@ async function runSmokeTest(window) {
 
 function createWindow() {
   const window = new BrowserWindow({
-    width: 1500,
+    width: isSmokeTest ? 1100 : 1500,
     height: 940,
     minWidth: 1050,
     minHeight: 700,

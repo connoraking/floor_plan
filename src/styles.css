@@ -646,6 +646,23 @@ input[type="number"] {
   justify-items: stretch;
   gap: 28px;
   padding: 28px 30px 80px;
+  scrollbar-color: #667085 #e4e7ec;
+  scrollbar-gutter: stable both-edges;
+}
+
+.page-gallery::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.page-gallery::-webkit-scrollbar-track {
+  background: #e4e7ec;
+}
+
+.page-gallery::-webkit-scrollbar-thumb {
+  border: 3px solid #e4e7ec;
+  border-radius: 10px;
+  background: #667085;
 }
 
 .page-gallery.spread {
@@ -781,6 +798,35 @@ input[type="number"] {
   cursor: not-allowed;
 }
 
+.resize-outline {
+  pointer-events: none;
+  fill: none;
+  stroke: var(--blue-700);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.resize-handle {
+  fill: var(--white);
+  stroke: var(--blue-700);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 2px rgb(16 24 40 / 45%));
+}
+
+.resize-width {
+  cursor: ew-resize;
+}
+
+.resize-depth {
+  cursor: ns-resize;
+}
+
+.resize-both {
+  cursor: nwse-resize;
+}
+
 .furniture-label {
   pointer-events: none;
   fill: #101828;
@@ -883,6 +929,18 @@ input[type="number"] {
 
 #inspector-form {
   padding: 22px 19px;
+}
+
+.resize-help {
+  margin: 0 0 14px;
+  padding: 9px 10px;
+  border: 1px solid #84adff;
+  border-radius: 7px;
+  color: #1849a9;
+  background: #eff4ff;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
 .inspector-heading {
@@ -1113,29 +1171,20 @@ label select {
   }
 
   .main-layout {
-    grid-template-columns: 270px minmax(0, 1fr);
+    grid-template-columns: 245px minmax(0, 1fr) 255px;
     overflow: hidden;
-  }
-
-  .inspector {
-    position: absolute;
-    z-index: 30;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 300px;
-    max-height: 100%;
-    box-shadow: -6px 0 20px rgb(16 24 40 / 18%);
-    transform: translateX(105%);
-    transition: transform 160ms ease;
-  }
-
-  .inspector.is-open {
-    transform: translateX(0);
   }
 }
 
 @media (max-width: 1120px) {
+  .main-layout {
+    grid-template-columns: 225px minmax(0, 1fr) 240px;
+  }
+
+  .document-summary {
+    display: none;
+  }
+
   .workspace-controls {
     gap: 10px;
   }

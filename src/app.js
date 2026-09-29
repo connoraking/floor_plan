@@ -6,6 +6,7 @@ import {
   furniturePath,
   normalizeAngle,
   pointFromPointer,
+  resizeFurnitureFromHandle,
   scaleFromCalibration,
   validateFurniture,
 } from "./geometry.js";
@@ -133,6 +134,7 @@ const state = {
   },
   pendingCalibration: null,
   drag: null,
+  resize: null,
   pageObserver: null,
   visiblePageIndexes: new Set(),
 };
@@ -468,10 +470,19 @@ function updateSurfaceSizes() {
     const width = page.width * CSS_PDF_SCALE * state.zoom * layoutFactor;
     page.surface.style.width = `${width}px`;
     page.surface.style.height = `${(width * page.height) / page.width}px`;
+    renderOverlay(page.index);
   }
   const zoomPercent = Math.round(state.zoom * 100);
   elements["zoom-value"].textContent = `${zoomPercent}%`;
   elements["zoom-slider"].value = String(zoomPercent);
+}
+
+function screenPixelsInPageUnits(page, pixels) {
+  const displayedWidth = page.svg?.getBoundingClientRect().width
+    || page.surface?.getBoundingClientRect().width
+    || Number.parseFloat(page.surface?.style.width)
+    || page.width;
+  return pixels * page.width / displayedWidth;
 }
 
 function spreadFitFactor() {
@@ -557,6 +568,44 @@ function renderOverlay(pageIndex) {
     const sizeLabel = createSvgElement("text", { class: "furniture-label", y: "11" });
     sizeLabel.textContent = `${formatInches(item.width)} × ${formatInches(item.depth)}`;
     group.append(path, nameLabel, sizeLabel);
+
+    if (item.id === state.selectedItemId && !item.locked) {
+      const halfWidth = item.width * page.pointsPerInch / 2;
+      const halfDepth = item.depth * page.pointsPerInch / 2;
+      const radius = screenPixelsInPageUnits(page, 7);
+      const outline = createSvgElement("rect", {
+        class: "resize-outline",
+        x: -halfWidth,
+        y: -halfDepth,
+        width: halfWidth * 2,
+        height: halfDepth * 2,
+      });
+      const widthHandle = createSvgElement("circle", {
+        class: "resize-handle resize-width",
+        cx: halfWidth,
+        cy: 0,
+        r: radius,
+        "data-resize-axis": "width",
+        "aria-label": "Drag to change width",
+      });
+      const depthHandle = createSvgElement("circle", {
+        class: "resize-handle resize-depth",
+        cx: 0,
+        cy: halfDepth,
+        r: radius,
+        "data-resize-axis": "depth",
+        "aria-label": "Drag to change depth",
+      });
+      const cornerHandle = createSvgElement("circle", {
+        class: "resize-handle resize-both",
+        cx: halfWidth,
+        cy: halfDepth,
+        r: radius,
+        "data-resize-axis": "both",
+        "aria-label": "Drag to change width and depth",
+      });
+      group.append(outline, widthHandle, depthHandle, cornerHandle);
+    }
     group.addEventListener("focus", () => selectItemFromKeyboard(item.id));
     group.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -590,6 +639,7 @@ function selectItemFromKeyboard(id) {
 }
 
 function appendCalibrationMarker(svg, start, end, label, temporary = false) {
+  const page = state.pages[Number(svg.dataset.pageIndex)];
   const line = createSvgElement("line", {
     class: `calibration-line${temporary ? " is-temporary" : ""}`,
     x1: start.x,
@@ -597,7 +647,7 @@ function appendCalibrationMarker(svg, start, end, label, temporary = false) {
     x2: end.x,
     y2: end.y,
   });
-  const radius = 5;
+  const radius = page ? screenPixelsInPageUnits(page, 4) : 4;
   const first = createSvgElement("circle", {
     class: "calibration-point",
     cx: start.x,
@@ -637,7 +687,7 @@ function handleOverlayPointerDown(event) {
       state.calibration.start = point;
       state.calibration.current = point;
       elements["calibration-guide-title"].textContent = "Now click the second endpoint";
-      elements["calibration-guide-detail"].textContent = "Move across the known dimension and click its other end.";
+      elements["calibration-guide-detail"].textContent = "The small dot marks the exact point. Move across the known dimension and click its other end.";
       renderOverlay(pageIndex);
     } else {
       try {
@@ -671,6 +721,19 @@ function handleOverlayPointerDown(event) {
   }
   event.preventDefault();
   const point = pointFromPointer(event, svg, page);
+  const resizeHandle = event.target.closest?.(".resize-handle");
+  if (resizeHandle) {
+    state.resize = {
+      itemId: item.id,
+      pageIndex,
+      pointerId: event.pointerId,
+      start: point,
+      axis: resizeHandle.dataset.resizeAxis,
+      item: { ...item },
+    };
+    svg.setPointerCapture(event.pointerId);
+    return;
+  }
   state.drag = { itemId: item.id, pageIndex, pointerId: event.pointerId, start: point, x: item.x, y: item.y };
   svg.setPointerCapture(event.pointerId);
 }
@@ -684,6 +747,25 @@ function handleOverlayPointerMove(event) {
     renderOverlay(pageIndex);
     return;
   }
+  if (state.resize && state.resize.pageIndex === pageIndex && state.resize.pointerId === event.pointerId) {
+    const item = state.items.find((entry) => entry.id === state.resize.itemId);
+    if (!item) return;
+    const point = pointFromPointer(event, svg, page);
+    const resized = resizeFurnitureFromHandle(
+      state.resize.item,
+      point.x - state.resize.start.x,
+      point.y - state.resize.start.y,
+      state.resize.axis,
+      page.pointsPerInch,
+    );
+    Object.assign(item, resized, {
+      x: clamp(resized.x, 0, page.width),
+      y: clamp(resized.y, 0, page.height),
+    });
+    renderOverlay(pageIndex);
+    updateInspector();
+    return;
+  }
   if (!state.drag || state.drag.pageIndex !== pageIndex || state.drag.pointerId !== event.pointerId) return;
   const item = state.items.find((entry) => entry.id === state.drag.itemId);
   if (!item) return;
@@ -694,6 +776,14 @@ function handleOverlayPointerMove(event) {
 }
 
 function handleOverlayPointerUp(event) {
+  if (state.resize?.pointerId === event.pointerId) {
+    const pageIndex = state.resize.pageIndex;
+    state.resize = null;
+    markDirty();
+    renderOverlay(pageIndex);
+    updateInspector();
+    return;
+  }
   if (!state.drag || state.drag.pointerId !== event.pointerId) return;
   const pageIndex = state.drag.pageIndex;
   state.drag = null;
@@ -712,7 +802,7 @@ function startCalibration() {
   state.calibration = { active: true, pageIndex: page.index, start: null, current: null };
   elements["calibration-guide"].hidden = false;
   elements["calibration-guide-title"].textContent = "Click the first endpoint";
-  elements["calibration-guide-detail"].textContent = "Choose one end of a printed measurement line on this page.";
+  elements["calibration-guide-detail"].textContent = "Zoom in if needed, then choose one exact end. The marker stays small at every zoom.";
   page.card.scrollIntoView({ behavior: "smooth", block: "center" });
   updateCalibrationCursors();
   updateUi();
@@ -1103,6 +1193,7 @@ async function createPagePngDataUrl(page) {
   const overlay = page.svg.cloneNode(true);
   overlay.querySelectorAll(".is-selected").forEach((node) => node.classList.remove("is-selected"));
   overlay.querySelectorAll(".is-temporary").forEach((node) => node.remove());
+  overlay.querySelectorAll(".resize-outline, .resize-handle").forEach((node) => node.remove());
   overlay.setAttribute("xmlns", SVG_NS);
   overlay.setAttribute("width", String(output.width));
   overlay.setAttribute("height", String(output.height));
@@ -1373,6 +1464,7 @@ window.__floorPlannerTest = {
     layout: state.layout,
     zoom: state.zoom,
     pdfPageNumbers: state.pages.map((page) => page.pdfPageNumber),
+    items: state.items.map(({ id, type, width, depth, x, y, rotation }) => ({ id, type, width, depth, x, y, rotation })),
   }),
   loadPdfBytes: (bytes, name = "test.pdf") => loadPdf(new Uint8Array(bytes), name),
   createExportPdfBytes,

@@ -3,6 +3,7 @@ import {
   distance,
   furniturePath,
   normalizeAngle,
+  resizeFurnitureFromHandle,
   scaleFromCalibration,
   toInches,
   validateFurniture,
@@ -59,5 +60,39 @@ describe("furniture geometry", () => {
   it("normalizes rotation", () => {
     expect(normalizeAngle(-15)).toBe(345);
     expect(normalizeAngle(375)).toBe(15);
+  });
+
+  it("resizes from the visible edge while keeping the opposite edge fixed", () => {
+    const result = resizeFurnitureFromHandle(
+      { type: "rect", width: 48, depth: 30, x: 100, y: 100, rotation: 0 },
+      20,
+      0,
+      "width",
+      2,
+    );
+    expect(result).toEqual({ width: 58, depth: 30, x: 110, y: 100 });
+  });
+
+  it("resizes rotated and L-shaped furniture in local coordinates", () => {
+    const rotated = resizeFurnitureFromHandle(
+      { type: "rect", width: 48, depth: 30, x: 100, y: 100, rotation: 90 },
+      0,
+      20,
+      "width",
+      2,
+    );
+    expect(rotated.width).toBe(58);
+    expect(rotated.x).toBeCloseTo(100);
+    expect(rotated.y).toBeCloseTo(110);
+
+    const clamped = resizeFurnitureFromHandle(
+      { type: "l", width: 60, depth: 50, returnWidth: 24, armDepth: 20, x: 100, y: 100, rotation: 0 },
+      -500,
+      -500,
+      "both",
+      2,
+    );
+    expect(clamped.width).toBe(24.25);
+    expect(clamped.depth).toBe(20.25);
   });
 });

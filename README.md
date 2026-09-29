@@ -23,9 +23,9 @@ The downloads are currently community-built and unsigned. Windows may show a pro
 2. Click the page you want, then click **Calibrate this page**.
 3. Click one end of a printed measurement and then its other end. Type the real distance. Check **Use this scale for every page** only when all pages use the same printed scale.
 4. Click **Rectangle** for beds, tables, rugs, and regular sofas, or **L-shape** for sectionals and corner desks.
-5. Enter the real dimensions in inches, then drag the colored piece into place.
+5. Enter the real dimensions in inches, then drag the colored piece into place. Click it again to reveal blue resize handles: drag the right handle for width, the bottom handle for depth, or the corner for both.
 
-Use **Page layout → Two-page view** to put two pages side by side. Continuous view makes each complete page fill the workspace width in one scrollable column. In either layout, 100% zoom means fit-to-width; use the slider to make pages smaller or larger. Click a piece to change its size, angle, color, name, or lock it in place.
+Use **Page layout → Two-page view** to put two pages side by side. Continuous view makes each complete page fill the workspace width in one scrollable column. In either layout, 100% zoom means fit-to-width; use the slider to make pages smaller or larger. The PDF scrollbars stay inside the middle workspace, so the furniture controls on the right always remain visible.
 
 Every page has a **Remove** button. Removing a page hides it from the project and removes furniture placed on that page; the original PDF embedded in the project is not modified. Use the always-visible zoom slider for exact zoom, the +/− buttons for small steps, or hold Ctrl while scrolling over a page.
 
@@ -39,11 +39,11 @@ Everything runs locally. Floor plans are not uploaded anywhere.
 - Loads long PDFs a few nearby pages at a time to keep the app responsive
 - Shows all PDF pages, with continuous and two-page layouts
 - Removes unwanted pages while preserving their original PDF page numbers
-- Simple click-click calibration with feet, inches, centimeters, or meters
+- Precise click-click calibration with zoom-independent endpoint markers and feet, inches, centimeters, or meters
 - Optional one-click scale copy across every page
 - Exact rectangles and guided L-shapes
 - Sofa, queen-bed, and dining-table shortcuts
-- Dragging, keyboard nudging, rotation, duplication, locking, and deletion
+- Direct width/depth resize handles, dragging, keyboard nudging, rotation, duplication, locking, and deletion
 - Portable project files with the source PDF embedded
 - Shareable multi-page PDF export with furniture included
 - High-contrast controls and visible keyboard focus
@@ -82,8 +82,8 @@ npm run dist:linux
 Push a version tag to run the included GitHub Actions release workflow:
 
 ```bash
-git tag v2.2.0
-git push origin v2.2.0
+git tag v2.3.0
+git push origin v2.3.0
 ```
 
 The workflow tests the app, builds the Windows, macOS, and Linux downloads, and attaches them to a GitHub Release. It can also be run manually from the repository's **Actions** tab to create test artifacts without publishing a release.

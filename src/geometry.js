@@ -54,6 +54,35 @@ export function furniturePath(item, pointsPerInch) {
   ].join(" ");
 }
 
+export function resizeFurnitureFromHandle(item, deltaX, deltaY, axis, pointsPerInch) {
+  if (!(pointsPerInch > 0)) throw new Error("A calibrated page scale is required to resize furniture.");
+
+  const angle = normalizeAngle(item.rotation) * Math.PI / 180;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const localDeltaX = deltaX * cosine + deltaY * sine;
+  const localDeltaY = -deltaX * sine + deltaY * cosine;
+  const minimumWidth = item.type === "l" ? Number(item.returnWidth) + 0.25 : 1;
+  const minimumDepth = item.type === "l" ? Number(item.armDepth) + 0.25 : 1;
+  const snap = (value) => Math.round(value * 4) / 4;
+  const width = axis === "width" || axis === "both"
+    ? Math.max(minimumWidth, snap(Number(item.width) + localDeltaX / pointsPerInch))
+    : Number(item.width);
+  const depth = axis === "depth" || axis === "both"
+    ? Math.max(minimumDepth, snap(Number(item.depth) + localDeltaY / pointsPerInch))
+    : Number(item.depth);
+
+  // Keep the opposite edge fixed, just like a conventional resize handle.
+  const centerShiftX = (width - Number(item.width)) * pointsPerInch / 2;
+  const centerShiftY = (depth - Number(item.depth)) * pointsPerInch / 2;
+  return {
+    width,
+    depth,
+    x: Number(item.x) + centerShiftX * cosine - centerShiftY * sine,
+    y: Number(item.y) + centerShiftX * sine + centerShiftY * cosine,
+  };
+}
+
 export function validateFurniture(input) {
   const item = {
     ...input,

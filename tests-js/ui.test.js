@@ -44,5 +44,7 @@ describe("visible desktop controls", () => {
     expect(css).toMatch(/grid-template-columns:\s*repeat\(2, max-content\)/);
     expect(css).toMatch(/grid-auto-rows:\s*max-content/);
     expect(css).toMatch(/justify-content:\s*safe center/);
+    expect(css).toMatch(/scrollbar-gutter:\s*stable both-edges/);
+    expect(css).not.toMatch(/\.inspector\s*\{[^}]*position:\s*absolute/s);
   });
 });

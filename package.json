@@ -1,6 +1,6 @@
 {
   "name": "easy-floor-planner",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "An offline desktop app for placing true-to-size furniture on PDF floor plans.",
   "main": "electron/main.cjs",
   "type": "module",

@@ -8,12 +8,39 @@ Floor Planner is a simple Windows app for placing correctly sized furniture on a
 
 1. Open the [latest Floor Planner release](https://github.com/connoraking/floor_plan/releases/latest).
 2. Find the **Assets** section.
-3. Download **`Floor-Planner-Setup-2.3.0.exe`**.
+3. Download **`Floor-Planner-Setup-2.3.1.exe`**.
 4. Double-click the downloaded file. Floor Planner will install and add a shortcut.
 
-Do not download the files named **Source code**. Those are for developers and will not install the app.
+### Which file should I click?
 
-If you do not want to install anything, download **`Floor-Planner-Portable-2.3.0.exe`** instead. Keep that file anywhere and double-click it whenever you want to use Floor Planner.
+- **`Floor-Planner-Setup-2.3.1.exe` — recommended:** Double-click this file to install Floor Planner. Afterward, open Floor Planner from its desktop or Start menu shortcut.
+- **`Floor-Planner-Portable-2.3.1.exe` — no installation:** Double-click this file each time you want to run Floor Planner. It does not create a shortcut.
+
+You only need one of these files. You do not need to download both.
+
+### What if the download is a ZIP file?
+
+There are two very different ZIP files on GitHub:
+
+#### `Source code (zip)` — do not download this to use the app
+
+This contains developer files such as `src`, `electron`, and `package.json`. It does not contain an installed copy of Floor Planner. A normal user cannot click one of those files to start the app.
+
+#### `Floor-Planner-Windows.zip` — a Windows build from the Actions page
+
+This ZIP contains the two usable Windows programs:
+
+- `Floor-Planner-Setup-2.3.1.exe`
+- `Floor-Planner-Portable-2.3.1.exe`
+
+To use it:
+
+1. Right-click **`Floor-Planner-Windows.zip`** and choose **Extract All**.
+2. Click **Extract**.
+3. Open the new extracted folder.
+4. Double-click **`Floor-Planner-Setup-2.3.1.exe`**. This is the recommended choice.
+
+Do not try to run the installer while it is still inside the ZIP. Extract it first.
 
 ### If Windows shows a warning
 
@@ -69,19 +96,32 @@ npm run build
 
 Create desktop packages with `npm run dist:win`, `npm run dist:mac`, or `npm run dist:linux` on the matching operating system.
 
+### Show the app version in a Starship prompt
+
+Starship reads this project’s version from `package.json`. Open `~/.config/starship.toml` and make sure its package section is:
+
+```toml
+[package]
+disabled = false
+display_private = true
+format = 'via [📦 $version]($style) '
+```
+
+Open a new terminal in this repository. The prompt will show the current app version, such as `v2.3.1`. `display_private = true` is required because this project is marked as a private npm package to prevent accidental publication to npm.
+
 </details>
 
 <details>
-<summary><strong>Repository owner — publishing version 2.3.0</strong></summary>
+<summary><strong>Repository owner — publishing version 2.3.1</strong></summary>
 
-The `v2.3.0` tag already exists locally. Do not create it again. Push the code and the existing tag with:
+The `v2.3.1` tag already exists locally. Do not create it again. Push the code and the existing tag with:
 
 ```bash
 git push origin main
-git push origin v2.3.0
+git push origin v2.3.1
 ```
 
-The second command must say `v2.3.0`, with one zero at the end. After the tag is pushed, GitHub Actions tests the app and creates the Windows, macOS, and Linux downloads. The Release can take several minutes to appear.
+After the tag is pushed, GitHub Actions tests the app and creates the Windows, macOS, and Linux downloads. The Release can take several minutes to appear.
 
 </details>
 

@@ -8,15 +8,14 @@ Floor Planner is a simple Windows app for placing correctly sized furniture on a
 
 1. Open the [latest Floor Planner release](https://github.com/connoraking/floor_plan/releases/latest).
 2. Find the **Assets** section.
-3. Download **`Floor-Planner-Setup-2.3.3.exe`**.
+3. Download **`Floor-Planner-Setup-2.3.4.exe`**.
 4. Double-click the downloaded file. Floor Planner will install and add a shortcut.
 
-### Which file should I click?
+### Click this file
 
-- **`Floor-Planner-Setup-2.3.3.exe` — recommended:** Double-click this file to install Floor Planner. Afterward, open Floor Planner from its desktop or Start menu shortcut.
-- **`Floor-Planner-Portable-2.3.3.exe` — no installation:** Double-click this file each time you want to run Floor Planner. It does not create a shortcut.
+- **`Floor-Planner-Setup-2.3.4.exe`** is the Windows app installer. Double-click it, finish the short installation, and then open Floor Planner from its desktop or Start menu shortcut.
 
-You only need one of these files. You do not need to download both.
+This is the only Windows program you need to download.
 
 ### What if the download is a ZIP file?
 
@@ -28,17 +27,16 @@ This contains developer files such as `src`, `electron`, and `package.json`. It 
 
 #### `Floor-Planner-Windows.zip` — a Windows build from the Actions page
 
-This ZIP contains the two usable Windows programs:
+This ZIP contains one usable Windows program:
 
-- `Floor-Planner-Setup-2.3.3.exe`
-- `Floor-Planner-Portable-2.3.3.exe`
+- `Floor-Planner-Setup-2.3.4.exe`
 
 To use it:
 
 1. Right-click **`Floor-Planner-Windows.zip`** and choose **Extract All**.
 2. Click **Extract**.
 3. Open the new extracted folder.
-4. Double-click **`Floor-Planner-Setup-2.3.3.exe`**. This is the recommended choice.
+4. Double-click **`Floor-Planner-Setup-2.3.4.exe`**.
 
 Do not try to run the installer while it is still inside the ZIP. Extract it first.
 
@@ -73,8 +71,8 @@ Removing a page inside Floor Planner does not change your original PDF.
 
 ## macOS and Linux
 
-- **macOS:** Download `Floor-Planner-2.3.3-universal.dmg`, open it, and drag Floor Planner into Applications. If macOS blocks the unsigned app, Control-click it and choose **Open**.
-- **Linux:** Download `Floor-Planner-2.3.3-x86_64.AppImage`, allow the file to run as a program in its Properties, then double-click it.
+- **macOS:** Download `Floor-Planner-2.3.4-universal.dmg`, open it, and drag Floor Planner into Applications. If macOS blocks the unsigned app, Control-click it and choose **Open**.
+- **Linux:** Download `Floor-Planner-2.3.4-x86_64.AppImage`, allow the file to run as a program in its Properties, then double-click it.
 
 <details>
 <summary><strong>Developer information — not needed to download or use the app</strong></summary>
@@ -108,18 +106,18 @@ display_private = true
 format = 'via [📦 $version]($style) '
 ```
 
-Open a new terminal in this repository. The prompt will show the current app version, such as `v2.3.3`. `display_private = true` is required because this project is marked as a private npm package to prevent accidental publication to npm.
+Open a new terminal in this repository. The prompt will show the current app version, such as `v2.3.4`. `display_private = true` is required because this project is marked as a private npm package to prevent accidental publication to npm.
 
 </details>
 
 <details>
-<summary><strong>Repository owner — publishing version 2.3.3</strong></summary>
+<summary><strong>Repository owner — publishing version 2.3.4</strong></summary>
 
-The `v2.3.3` tag already exists locally. Do not create it again. Push the code and the existing tag with:
+The `v2.3.4` tag already exists locally. Do not create it again. Push the code and the existing tag with:
 
 ```bash
 git push origin main
-git push origin v2.3.3
+git push origin v2.3.4
 ```
 
 After the tag is pushed, GitHub Actions creates one Release immediately after the tests pass. Independent Windows, macOS, and Linux jobs attach their own downloads as they finish, so one platform cannot prevent another platform from publishing.

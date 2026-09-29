@@ -1,97 +1,94 @@
 # Floor Planner
 
-An easy, offline desktop app for checking whether furniture fits on a PDF floor plan. Open every page of the plan together, set the drawing scale with two clicks, and place true-to-size rectangles or L-shaped pieces.
+Floor Planner is a simple Windows app for placing correctly sized furniture on a PDF floor plan. It works offline and does not upload your floor plan anywhere.
 
-## Download the app
+## Download on Windows
 
-**You do not need Python, Node, a terminal, or any technical setup.**
+**You do not need Python, Node.js, Git, or a terminal.**
 
-Go to the [latest Floor Planner release](https://github.com/connoraking/floor_plan/releases/latest), open **Assets**, and download the file for your computer:
+1. Open the [latest Floor Planner release](https://github.com/connoraking/floor_plan/releases/latest).
+2. Find the **Assets** section.
+3. Download **`Floor-Planner-Setup-2.3.0.exe`**.
+4. Double-click the downloaded file. Floor Planner will install and add a shortcut.
 
-| Computer | Download | What to do |
-|---|---|---|
-| Windows 10/11 | `Floor-Planner-Setup-...exe` | Recommended. Double-click once to install, then use the desktop shortcut. |
-| Windows 10/11 | `Floor-Planner-Portable-...exe` | No installation. Keep the one file anywhere and double-click it. |
-| macOS | `Floor-Planner-...dmg` | Open it and drag Floor Planner to Applications. |
-| Linux | `Floor-Planner-...AppImage` | Make it executable, then double-click it. |
+Do not download the files named **Source code**. Those are for developers and will not install the app.
 
-The downloads are currently community-built and unsigned. Windows may show a protection message the first time; choose **More info → Run anyway** only if the download came from this repository. On macOS, Control-click the app and choose **Open** the first time.
+If you do not want to install anything, download **`Floor-Planner-Portable-2.3.0.exe`** instead. Keep that file anywhere and double-click it whenever you want to use Floor Planner.
 
-## Using Floor Planner
+### If Windows shows a warning
 
-1. Click **Open PDF** and choose a floor plan. Every page appears in the middle of the window.
-2. Click the page you want, then click **Calibrate this page**.
-3. Click one end of a printed measurement and then its other end. Type the real distance. Check **Use this scale for every page** only when all pages use the same printed scale.
-4. Click **Rectangle** for beds, tables, rugs, and regular sofas, or **L-shape** for sectionals and corner desks.
-5. Enter the real dimensions in inches, then drag the colored piece into place. Click it again to reveal blue resize handles: drag the right handle for width, the bottom handle for depth, or the corner for both.
+The app is free and is not code-signed yet, so Windows may show **Windows protected your PC** the first time.
 
-Use **Page layout → Two-page view** to put two pages side by side. Continuous view makes each complete page fill the workspace width in one scrollable column. In either layout, 100% zoom means fit-to-width; use the slider to make pages smaller or larger. The PDF scrollbars stay inside the middle workspace, so the furniture controls on the right always remain visible.
+Only when the file came from this repository, click **More info**, then **Run anyway**.
 
-Every page has a **Remove** button. Removing a page hides it from the project and removes furniture placed on that page; the original PDF embedded in the project is not modified. Use the always-visible zoom slider for exact zoom, the +/− buttons for small steps, or hold Ctrl while scrolling over a page.
+## How to use it
 
-**Save editable** creates one portable `.floorplan` working file containing the PDF, scale, and furniture so you can keep editing later. **Export PDF** creates a normal, shareable PDF containing every visible floor-plan page with its furniture flattened on top.
+1. Click **Open PDF** and choose your floor plan.
+2. Select a page and click **Calibrate**.
+3. Click both ends of a measurement printed on the plan, then enter its real length.
+4. Click **Rectangle** or **L-shape** and enter the furniture dimensions.
+5. Drag the furniture into place.
 
-Everything runs locally. Floor plans are not uploaded anywhere.
+When furniture is selected, use its blue handles:
 
-## Features
+- Drag the right handle to change its width.
+- Drag the bottom handle to change its depth.
+- Drag the corner handle to change both.
 
-- Opens standard and multi-page PDF floor plans
-- Loads long PDFs a few nearby pages at a time to keep the app responsive
-- Shows all PDF pages, with continuous and two-page layouts
-- Removes unwanted pages while preserving their original PDF page numbers
-- Precise click-click calibration with zoom-independent endpoint markers and feet, inches, centimeters, or meters
-- Optional one-click scale copy across every page
-- Exact rectangles and guided L-shapes
-- Sofa, queen-bed, and dining-table shortcuts
-- Direct width/depth resize handles, dragging, keyboard nudging, rotation, duplication, locking, and deletion
-- Portable project files with the source PDF embedded
-- Shareable multi-page PDF export with furniture included
-- High-contrast controls and visible keyboard focus
-- Fully offline after download
+Use the controls on the right to enter exact dimensions, rotate the furniture, change its color, duplicate it, lock it, or delete it.
 
-## Development
+## Save or share your plan
 
-The current app is Electron plus plain JavaScript and PDF.js. Python is not used by the app or its downloadable builds.
+- **Save editable** creates a `.floorplan` file that you can open later and continue editing.
+- **Export PDF** creates a normal PDF with the furniture included. Send this PDF to anyone you want.
 
-Install [Node.js 24](https://nodejs.org/), then run:
+Removing a page inside Floor Planner does not change your original PDF.
+
+## Other computers
+
+The release page also provides a macOS `.dmg` and a Linux `.AppImage`. Windows users should choose one of the `.exe` files described above.
+
+<details>
+<summary><strong>Developer information — not needed to download or use the app</strong></summary>
+
+The app is built with Electron, JavaScript, and PDF.js. Python is not used.
+
+Node.js 24 is only needed if you want to change the source code or build the app yourself:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Tests and a production renderer build:
+Run the automated tests and production build with:
 
 ```bash
 npm test
 npm run build
 ```
 
-Create local packages:
+Create desktop packages with `npm run dist:win`, `npm run dist:mac`, or `npm run dist:linux` on the matching operating system.
+
+</details>
+
+<details>
+<summary><strong>Repository owner — publishing version 2.3.0</strong></summary>
+
+The `v2.3.0` tag already exists locally. Do not create it again. Push the code and the existing tag with:
 
 ```bash
-npm run dist:win
-npm run dist:mac
-npm run dist:linux
-```
-
-`npm run dist:win` produces both the installer and portable EXE under `release/`.
-
-## Publishing downloads to GitHub
-
-Push a version tag to run the included GitHub Actions release workflow:
-
-```bash
-git tag v2.3.0
+git push origin main
 git push origin v2.3.0
 ```
 
-The workflow tests the app, builds the Windows, macOS, and Linux downloads, and attaches them to a GitHub Release. It can also be run manually from the repository's **Actions** tab to create test artifacts without publishing a release.
+The second command must say `v2.3.0`, with one zero at the end. After the tag is pushed, GitHub Actions tests the app and creates the Windows, macOS, and Linux downloads. The Release can take several minutes to appear.
 
-## Current scope
+</details>
 
-The app uses guided rectangles and L-shapes so dimensions remain exact. The PDF is a visual background; Floor Planner does not automatically detect walls or prevent furniture from overlapping them.
+## Current limitations
+
+Furniture uses rectangles and L-shapes so its dimensions stay exact. The PDF is a visual background; the app does not automatically detect walls or prevent furniture from overlapping them.
 
 ## License
 
-Floor Planner is MIT licensed. See `THIRD_PARTY_NOTICES.md` for the major components included in desktop builds.
+Floor Planner is MIT licensed. See `THIRD_PARTY_NOTICES.md` for information about the main components included in the desktop app.

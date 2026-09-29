@@ -93,7 +93,7 @@ button:disabled {
 .topbar {
   z-index: 20;
   display: grid;
-  grid-template-columns: 315px 1fr auto;
+  grid-template-columns: 315px 1fr;
   align-items: center;
   gap: 20px;
   padding: 0 20px;
@@ -163,11 +163,27 @@ button:disabled {
   gap: 9px;
 }
 
+.top-actions {
+  justify-content: flex-end;
+}
+
 .zoom-controls output {
-  width: 52px;
-  color: #eaecf0;
+  width: 48px;
+  color: var(--navy-950);
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.zoom-label {
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+#zoom-slider {
+  width: 112px;
+  accent-color: var(--blue-600);
+  cursor: pointer;
 }
 
 .button,
@@ -488,7 +504,7 @@ button:disabled {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 52px 1fr;
+  grid-template-rows: 64px 1fr;
   background-color: #d0d5dd;
   background-image: radial-gradient(#98a2b3 0.75px, transparent 0.75px);
   background-size: 15px 15px;
@@ -506,8 +522,16 @@ button:disabled {
   box-shadow: 0 1px 3px rgb(16 24 40 / 10%);
 }
 
-.workspace-toolbar > div {
+.document-summary {
   min-width: 0;
+}
+
+.workspace-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
 }
 
 .workspace-toolbar strong {
@@ -614,15 +638,17 @@ input[type="number"] {
 
 .page-gallery {
   display: grid;
+  grid-template-columns: max-content;
   align-content: start;
-  justify-items: center;
+  justify-content: safe center;
+  justify-items: stretch;
   gap: 28px;
   padding: 28px 30px 80px;
 }
 
 .page-gallery.spread {
   grid-template-columns: repeat(2, max-content);
-  justify-content: center;
+  justify-content: safe center;
   align-items: start;
   gap: 22px;
 }
@@ -658,6 +684,12 @@ input[type="number"] {
   font-weight: 750;
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .page-info {
   display: flex;
   min-width: 92px;
@@ -683,6 +715,22 @@ input[type="number"] {
   position: relative;
   overflow: hidden;
   background: var(--white);
+}
+
+.pdf-surface::before {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  color: var(--gray-600);
+  content: "Loading page…";
+  font-size: 14px;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+}
+
+.pdf-surface.is-rendered::before {
+  display: none;
 }
 
 .pdf-surface canvas,
@@ -1041,7 +1089,7 @@ label select {
 
 @media (max-width: 1260px) {
   .topbar {
-    grid-template-columns: 235px 1fr auto;
+    grid-template-columns: 235px 1fr;
   }
 
   .brand small {
@@ -1060,10 +1108,6 @@ label select {
 @media (max-width: 1250px) {
   .topbar {
     grid-template-columns: auto 1fr;
-  }
-
-  .zoom-controls {
-    display: none;
   }
 
   .main-layout {
@@ -1086,5 +1130,23 @@ label select {
 
   .inspector.is-open {
     transform: translateX(0);
+  }
+}
+
+@media (max-width: 1120px) {
+  .workspace-controls {
+    gap: 10px;
+  }
+
+  .zoom-label {
+    display: none;
+  }
+
+  #zoom-slider {
+    width: 82px;
+  }
+
+  .zoom-controls {
+    gap: 5px;
   }
 }

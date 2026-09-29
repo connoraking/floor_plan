@@ -4,6 +4,17 @@ import { describe, expect, it } from "vitest";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 describe("multi-page PDF support", () => {
+  it("opens PDFs with more than two pages", async () => {
+    const path = resolve(process.cwd(), "tests-js/fixtures/five-page-floor-plan.pdf");
+    const bytes = new Uint8Array(await readFile(path));
+    const loadingTask = getDocument({ data: bytes, disableWorker: true });
+    const document = await loadingTask.promise;
+
+    expect(document.numPages).toBe(5);
+    expect((await document.getPage(5)).getViewport({ scale: 1 }).width).toBe(612);
+    await loadingTask.destroy();
+  });
+
   it("opens the two-page floor-plan fixture and exposes both pages", async () => {
     const path = resolve(process.cwd(), "tests-js/fixtures/two-page-floor-plan.pdf");
     const bytes = new Uint8Array(await readFile(path));

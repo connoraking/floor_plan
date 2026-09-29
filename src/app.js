@@ -16,12 +16,15 @@ import {
   bytesToBase64,
   parseProject,
 } from "./project.js";
-import { calculateSpreadFitFactor } from "./layout.js";
+import { calculateCappedRenderScale, calculateSpreadFitFactor } from "./layout.js";
+import { pageRecordsForProject, removePageAt } from "./pages.js";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const CSS_PDF_SCALE = 1.12;
+const MAX_RENDER_PIXELS = 10_000_000;
+const MAX_RENDERED_PAGE_CANVASES = 4;
 const COLORS = ["#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed"];
 const EXPORT_SVG_STYLES = `
   .furniture-shape { stroke: #101828; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
@@ -43,6 +46,7 @@ const elements = Object.fromEntries(
     "zoom-out",
     "zoom-in",
     "zoom-fit",
+    "zoom-slider",
     "zoom-value",
     "pdf-summary",
     "scale-summary",
@@ -124,6 +128,8 @@ const state = {
   },
   pendingCalibration: null,
   drag: null,
+  pageObserver: null,
+  visiblePageIndexes: new Set(),
 };
 
 function createSvgElement(name, attributes = {}) {
@@ -205,13 +211,15 @@ async function loadPdf(bytes, fileName, restoredProject = null) {
     const retainedBytes = bytes.slice();
     loadingTask = getDocument({ data: bytes.slice() });
     const pdf = await loadingTask.promise;
+    const records = pageRecordsForProject(pdf.numPages, restoredProject ? restoredProject.pages : null);
     const newPages = [];
-    for (let index = 0; index < pdf.numPages; index += 1) {
-      const pdfPage = await pdf.getPage(index + 1);
+    for (let index = 0; index < records.length; index += 1) {
+      const { pdfPageNumber, savedPage: restoredPage } = records[index];
+      const pdfPage = await pdf.getPage(pdfPageNumber);
       const viewport = pdfPage.getViewport({ scale: 1 });
-      const restoredPage = restoredProject?.pages?.[index];
       newPages.push({
         index,
+        pdfPageNumber,
         pdfPage,
         width: viewport.width,
         height: viewport.height,
@@ -222,6 +230,8 @@ async function loadPdf(bytes, fileName, restoredProject = null) {
         surface: null,
         canvas: null,
         svg: null,
+        renderPromise: null,
+        rendered: false,
       });
     }
 
@@ -258,7 +268,8 @@ async function loadPdf(bytes, fileName, restoredProject = null) {
     state.selectedItemId = null;
 
     buildPageGallery();
-    for (const page of state.pages) await renderPdfPage(page);
+    updateSurfaceSizes();
+    await ensurePageRendered(0);
     updateUi();
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
     fitActivePage(false);
@@ -292,20 +303,23 @@ function setLoading(loading, message = "Loading…") {
 
 function buildPageGallery() {
   const gallery = elements["page-gallery"];
+  state.pageObserver?.disconnect();
+  state.pageObserver = null;
+  state.visiblePageIndexes.clear();
   gallery.replaceChildren();
   for (const page of state.pages) {
     const card = document.createElement("article");
     card.className = "page-card";
     card.dataset.pageIndex = page.index;
     card.tabIndex = 0;
-    card.setAttribute("aria-label", `Page ${page.index + 1}`);
+    card.setAttribute("aria-label", `PDF page ${page.pdfPageNumber}`);
 
     const header = document.createElement("header");
     header.className = "page-header";
     const pageInfo = document.createElement("div");
     pageInfo.className = "page-info";
     const pageName = document.createElement("strong");
-    pageName.textContent = `Page ${page.index + 1}`;
+    pageName.textContent = `PDF page ${page.pdfPageNumber}`;
     const scaleStatus = document.createElement("span");
     scaleStatus.className = "page-scale-status";
     scaleStatus.dataset.role = "scale-status";
@@ -313,21 +327,37 @@ function buildPageGallery() {
     const pageCalibrate = document.createElement("button");
     pageCalibrate.className = "button button-accent button-small page-calibrate";
     pageCalibrate.type = "button";
-    pageCalibrate.textContent = `Calibrate page ${page.index + 1}`;
+    pageCalibrate.textContent = "Calibrate";
+    pageCalibrate.setAttribute("aria-label", `Calibrate PDF page ${page.pdfPageNumber}`);
     pageCalibrate.addEventListener("click", (event) => {
       event.stopPropagation();
       setActivePage(page.index);
       startCalibration();
     });
-    header.append(pageInfo, pageCalibrate);
+    const removeButton = document.createElement("button");
+    removeButton.className = "button button-danger button-small page-remove";
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.disabled = state.pages.length <= 1;
+    removeButton.title = removeButton.disabled ? "A floor plan must keep at least one page" : `Remove PDF page ${page.pdfPageNumber}`;
+    removeButton.setAttribute("aria-label", `Remove PDF page ${page.pdfPageNumber}`);
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removePage(page.index);
+    });
+    const pageActions = document.createElement("div");
+    pageActions.className = "page-actions";
+    pageActions.append(pageCalibrate, removeButton);
+    header.append(pageInfo, pageActions);
 
     const surface = document.createElement("div");
     surface.className = "pdf-surface";
     const canvas = document.createElement("canvas");
+    canvas.setAttribute("aria-hidden", "true");
     const svg = createSvgElement("svg", {
       class: "page-overlay",
       viewBox: `0 0 ${page.width} ${page.height}`,
-      "aria-label": `Furniture overlay for page ${page.index + 1}`,
+      "aria-label": `Furniture overlay for PDF page ${page.pdfPageNumber}`,
     });
     svg.dataset.pageIndex = page.index;
     surface.append(canvas, svg);
@@ -351,17 +381,78 @@ function buildPageGallery() {
     svg.addEventListener("pointercancel", handleOverlayPointerUp);
     renderOverlay(page.index);
   }
+  observePageVisibility();
+}
+
+function observePageVisibility() {
+  if (!("IntersectionObserver" in window)) {
+    for (const page of state.pages) ensurePageRendered(page.index);
+    return;
+  }
+  state.pageObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const pageIndex = Number(entry.target.dataset.pageIndex);
+      if (entry.isIntersecting) {
+        state.visiblePageIndexes.add(pageIndex);
+        ensurePageRendered(pageIndex);
+      } else {
+        state.visiblePageIndexes.delete(pageIndex);
+      }
+    }
+  }, { root: elements["page-gallery"], rootMargin: "350px 0px" });
+  for (const page of state.pages) state.pageObserver.observe(page.card);
+}
+
+async function ensurePageRendered(pageIndex) {
+  const page = state.pages[pageIndex];
+  if (!page || page.rendered) return;
+  if (page.renderPromise) return page.renderPromise;
+  page.renderPromise = renderPdfPage(page)
+    .then(() => {
+      page.rendered = true;
+      page.surface?.classList.add("is-rendered");
+      evictDistantPageCanvases(page.index);
+    })
+    .catch((error) => {
+      if (error?.name !== "RenderingCancelledException") {
+        showToast(`Could not display PDF page ${page.pdfPageNumber}: ${safeErrorMessage(error, "Unknown error")}`, true);
+      }
+    })
+    .finally(() => {
+      page.renderPromise = null;
+    });
+  return page.renderPromise;
 }
 
 async function renderPdfPage(page) {
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  const viewport = page.pdfPage.getViewport({ scale: CSS_PDF_SCALE * pixelRatio });
+  const baseViewport = page.pdfPage.getViewport({ scale: 1 });
+  const renderScale = calculateCappedRenderScale(
+    baseViewport.width,
+    baseViewport.height,
+    CSS_PDF_SCALE * Math.min(window.devicePixelRatio || 1, 2),
+    MAX_RENDER_PIXELS,
+  );
+  const viewport = page.pdfPage.getViewport({ scale: renderScale });
   page.canvas.width = Math.floor(viewport.width);
   page.canvas.height = Math.floor(viewport.height);
   const context = page.canvas.getContext("2d", { alpha: false });
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, page.canvas.width, page.canvas.height);
   await page.pdfPage.render({ canvasContext: context, viewport }).promise;
+}
+
+function evictDistantPageCanvases(referenceIndex) {
+  const rendered = () => state.pages.filter((page) => page.rendered);
+  while (rendered().length > MAX_RENDERED_PAGE_CANVASES) {
+    const candidate = rendered()
+      .filter((page) => page.index !== referenceIndex && page.index !== state.activePage && !state.visiblePageIndexes.has(page.index))
+      .sort((first, second) => Math.abs(second.index - referenceIndex) - Math.abs(first.index - referenceIndex))[0];
+    if (!candidate) return;
+    candidate.canvas.width = 1;
+    candidate.canvas.height = 1;
+    candidate.rendered = false;
+    candidate.surface?.classList.remove("is-rendered");
+  }
 }
 
 function updateSurfaceSizes() {
@@ -371,7 +462,9 @@ function updateSurfaceSizes() {
     page.surface.style.width = `${width}px`;
     page.surface.style.height = `${(width * page.height) / page.width}px`;
   }
-  elements["zoom-value"].textContent = `${Math.round(state.zoom * 100)}%`;
+  const zoomPercent = Math.round(state.zoom * 100);
+  elements["zoom-value"].textContent = `${zoomPercent}%`;
+  elements["zoom-slider"].value = String(zoomPercent);
 }
 
 function spreadFitFactor() {
@@ -383,11 +476,46 @@ function spreadFitFactor() {
 }
 
 function setActivePage(index) {
-  if (!state.pages[index] || state.activePage === index) return;
+  if (!state.pages[index]) return;
+  ensurePageRendered(index);
+  if (state.activePage === index) return;
   if (state.calibration.active) cancelCalibration();
   state.activePage = index;
   if (selectedItem()?.pageIndex !== index) state.selectedItemId = null;
   updateUi();
+}
+
+function removePage(index) {
+  const page = state.pages[index];
+  if (!page) return;
+  if (state.pages.length <= 1) {
+    showToast("A floor plan must keep at least one page.", true);
+    return;
+  }
+  const furnitureCount = state.items.filter((item) => item.pageIndex === index).length;
+  const furnitureWarning = furnitureCount
+    ? ` This will also remove ${furnitureCount} furniture piece${furnitureCount === 1 ? "" : "s"} from that page.`
+    : "";
+  if (!window.confirm(`Remove PDF page ${page.pdfPageNumber} from this project?${furnitureWarning}`)) return;
+
+  if (state.calibration.active || state.pendingCalibration) cancelCalibration();
+  const previousActivePage = state.activePage;
+  const result = removePageAt(state.pages, state.items, index);
+  state.pages = result.pages;
+  state.items = result.items;
+  state.selectedItemId = state.items.some((item) => item.id === state.selectedItemId) ? state.selectedItemId : null;
+  state.activePage = previousActivePage === index
+    ? Math.min(index, state.pages.length - 1)
+    : previousActivePage > index
+      ? previousActivePage - 1
+      : previousActivePage;
+  buildPageGallery();
+  updateSurfaceSizes();
+  ensurePageRendered(state.activePage);
+  markDirty();
+  updateUi();
+  state.pages[state.activePage]?.card?.scrollIntoView({ block: "center" });
+  showToast(`PDF page ${page.pdfPageNumber} removed from this project.`);
 }
 
 function renderOverlay(pageIndex) {
@@ -627,7 +755,8 @@ function applyCalibration(event) {
     elements["calibration-dialog"].close();
     markDirty();
     updateUi();
-    showToast(elements["calibration-all-pages"].checked ? "Scale set for every page." : `Scale set for page ${pending.pageIndex + 1}.`);
+    const calibratedPage = state.pages[pending.pageIndex];
+    showToast(elements["calibration-all-pages"].checked ? "Scale set for every page." : `Scale set for PDF page ${calibratedPage.pdfPageNumber}.`);
   } catch (error) {
     showToast(safeErrorMessage(error, "Enter a valid measurement."), true);
   }
@@ -817,32 +946,36 @@ function updateUi() {
   const hasPdf = Boolean(state.pdf);
   const page = activePage();
   const calibrated = Boolean(page?.pointsPerInch);
+  const visiblePageCount = state.pages.length;
+  const originalPageCount = state.pdf?.numPages || 0;
+  const pageCountText = visiblePageCount === originalPageCount
+    ? `${visiblePageCount} page${visiblePageCount === 1 ? "" : "s"}`
+    : `${visiblePageCount} of ${originalPageCount} pages`;
   elements["drop-zone"].hidden = hasPdf;
   elements["page-gallery"].hidden = !hasPdf;
   elements["document-name"].textContent = state.fileName || "No floor plan open";
-  elements["page-count"].textContent = hasPdf
-    ? `${state.pages.length} page${state.pages.length === 1 ? "" : "s"}`
-    : "";
+  elements["page-count"].textContent = hasPdf ? pageCountText : "";
   elements["pdf-summary"].textContent = hasPdf
-    ? `${state.pages.length} page${state.pages.length === 1 ? "" : "s"} ready`
+    ? `${pageCountText} ready`
     : "No PDF open";
   elements["calibrate"].disabled = !hasPdf;
   elements["calibrate"].textContent = state.calibration.active
     ? "Cancel calibration"
     : page
-      ? `Calibrate page ${page.index + 1}`
+      ? `Calibrate PDF page ${page.pdfPageNumber}`
       : "Calibrate this page";
   elements["calibrate"].setAttribute("aria-pressed", state.calibration.active ? "true" : "false");
-  elements["active-page-status"].textContent = page ? `Page ${page.index + 1} selected.` : "";
+  elements["active-page-status"].textContent = page ? `PDF page ${page.pdfPageNumber} selected.` : "";
   elements["scale-summary"].textContent = !hasPdf
     ? "Open a PDF first"
     : calibrated
-      ? `Page ${page.index + 1} ready · ${page.scaleLabel || "scale set"}`
-      : `Page ${page.index + 1} needs a scale`;
+      ? `PDF page ${page.pdfPageNumber} ready · ${page.scaleLabel || "scale set"}`
+      : `PDF page ${page.pdfPageNumber} needs a scale`;
   for (const id of ["add-rectangle", "add-l-shape"]) elements[id].disabled = !hasPdf;
   for (const preset of document.querySelectorAll(".preset")) preset.disabled = !hasPdf;
   elements["save-project"].disabled = !hasPdf;
   elements["export-png"].disabled = !hasPdf;
+  for (const id of ["zoom-out", "zoom-in", "zoom-fit", "zoom-slider"]) elements[id].disabled = !hasPdf;
 
   elements["step-open"].classList.toggle("is-complete", hasPdf);
   elements["step-open"].classList.toggle("is-current", !hasPdf);
@@ -871,6 +1004,7 @@ function projectPayload() {
     pdfName: state.fileName,
     pdfBase64: bytesToBase64(state.pdfBytes),
     pages: state.pages.map((page) => ({
+      pdfPageNumber: page.pdfPageNumber,
       pointsPerInch: page.pointsPerInch,
       scaleLabel: page.scaleLabel,
       calibration: page.calibration,
@@ -955,6 +1089,7 @@ async function exportCurrentPage() {
   const page = activePage();
   if (!page) return;
   try {
+    await ensurePageRendered(page.index);
     const output = document.createElement("canvas");
     output.width = page.canvas.width;
     output.height = page.canvas.height;
@@ -982,7 +1117,7 @@ async function exportCurrentPage() {
     URL.revokeObjectURL(svgUrl);
     const dataUrl = output.toDataURL("image/png");
     const baseName = (state.fileName || "floor-plan").replace(/\.pdf$/i, "");
-    const suggestedName = `${baseName}-page-${page.index + 1}.png`;
+    const suggestedName = `${baseName}-page-${page.pdfPageNumber}.png`;
     if (electronApi) {
       const path = await electronApi.exportPng({ suggestedName, dataUrl });
       if (!path) return;
@@ -990,15 +1125,45 @@ async function exportCurrentPage() {
       const response = await fetch(dataUrl);
       downloadBlob(await response.blob(), suggestedName);
     }
-    showToast(`Page ${page.index + 1} exported.`);
+    showToast(`PDF page ${page.pdfPageNumber} exported.`);
   } catch (error) {
     showToast(`Could not export this page: ${safeErrorMessage(error, "Unknown error")}`, true);
   }
 }
 
-function setZoom(nextZoom) {
-  state.zoom = clamp(Math.round(nextZoom * 10) / 10, 0.4, 2.5);
+function setZoom(nextZoom, anchor = null) {
+  const gallery = elements["page-gallery"];
+  const galleryRect = gallery.getBoundingClientRect();
+  let referencePage = Number.isInteger(anchor?.pageIndex) ? state.pages[anchor.pageIndex] : null;
+  if (!referencePage?.card) {
+    const centerY = galleryRect.top + galleryRect.height / 2;
+    referencePage = state.pages
+      .filter((page) => page.card)
+      .sort((first, second) => {
+        const firstRect = first.card.getBoundingClientRect();
+        const secondRect = second.card.getBoundingClientRect();
+        return Math.abs((firstRect.top + firstRect.bottom) / 2 - centerY)
+          - Math.abs((secondRect.top + secondRect.bottom) / 2 - centerY);
+      })[0] || activePage();
+  }
+  const before = referencePage?.card?.getBoundingClientRect();
+  const focusX = before
+    ? clamp(anchor?.clientX ?? galleryRect.left + galleryRect.width / 2, before.left, before.right)
+    : 0;
+  const focusY = before
+    ? clamp(anchor?.clientY ?? galleryRect.top + galleryRect.height / 2, before.top, before.bottom)
+    : 0;
+  const ratioX = before?.width ? (focusX - before.left) / before.width : 0.5;
+  const ratioY = before?.height ? (focusY - before.top) / before.height : 0.5;
+
+  state.zoom = clamp(Math.round(nextZoom * 20) / 20, 0.4, 2.5);
   updateSurfaceSizes();
+
+  const after = referencePage?.card?.getBoundingClientRect();
+  if (before && after) {
+    gallery.scrollLeft += after.left + after.width * ratioX - focusX;
+    gallery.scrollTop += after.top + after.height * ratioY - focusY;
+  }
 }
 
 function fitActivePage(allowUpscale = true) {
@@ -1009,7 +1174,11 @@ function fitActivePage(allowUpscale = true) {
     return;
   }
   const galleryWidth = elements["page-gallery"].clientWidth - 72;
-  const fittedZoom = galleryWidth / (page.width * CSS_PDF_SCALE);
+  const galleryHeight = elements["page-gallery"].clientHeight - 100;
+  const fittedZoom = Math.min(
+    galleryWidth / (page.width * CSS_PDF_SCALE),
+    galleryHeight / (page.height * CSS_PDF_SCALE),
+  );
   setZoom(allowUpscale ? fittedZoom : Math.min(1, fittedZoom));
 }
 
@@ -1030,6 +1199,21 @@ function handleKeyboard(event) {
   if (modifier && event.key.toLowerCase() === "d" && selectedItem()) {
     event.preventDefault();
     duplicateSelected();
+    return;
+  }
+  if (modifier && (event.key === "+" || event.key === "=")) {
+    event.preventDefault();
+    setZoom(state.zoom + 0.1);
+    return;
+  }
+  if (modifier && event.key === "-") {
+    event.preventDefault();
+    setZoom(state.zoom - 0.1);
+    return;
+  }
+  if (modifier && event.key === "0") {
+    event.preventDefault();
+    fitActivePage(true);
     return;
   }
   if (event.key === "Escape" && state.calibration.active) {
@@ -1112,6 +1296,7 @@ function bindEvents() {
   elements["zoom-out"].addEventListener("click", () => setZoom(state.zoom - 0.1));
   elements["zoom-in"].addEventListener("click", () => setZoom(state.zoom + 0.1));
   elements["zoom-fit"].addEventListener("click", () => fitActivePage(true));
+  elements["zoom-slider"].addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
   elements["page-layout"].addEventListener("change", (event) => {
     state.layout = event.target.value;
     elements["page-gallery"].classList.toggle("spread", state.layout === "spread");
@@ -1120,7 +1305,12 @@ function bindEvents() {
   elements["page-gallery"].addEventListener("wheel", (event) => {
     if (!event.ctrlKey) return;
     event.preventDefault();
-    setZoom(state.zoom + (event.deltaY < 0 ? 0.1 : -0.1));
+    const card = event.target.closest?.(".page-card");
+    setZoom(state.zoom + (event.deltaY < 0 ? 0.1 : -0.1), {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pageIndex: card ? Number(card.dataset.pageIndex) : state.activePage,
+    });
   }, { passive: false });
 
   const dropZone = elements["drop-zone"];
@@ -1157,6 +1347,8 @@ window.__floorPlannerTest = {
     calibratedPages: state.pages.filter((page) => page.pointsPerInch).length,
     itemCount: state.items.length,
     layout: state.layout,
+    zoom: state.zoom,
+    pdfPageNumbers: state.pages.map((page) => page.pdfPageNumber),
   }),
   loadPdfBytes: (bytes, name = "test.pdf") => loadPdf(new Uint8Array(bytes), name),
 };

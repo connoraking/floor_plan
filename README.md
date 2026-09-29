@@ -27,6 +27,8 @@ The downloads are currently community-built and unsigned. Windows may show a pro
 
 Use **Page layout → Two-page view** to put two pages side by side. Continuous view keeps every page in one scrollable column. Click a piece to change its size, angle, color, name, or lock it in place.
 
+Every page has a **Remove** button. Removing a page hides it from the project and removes furniture placed on that page; the original PDF embedded in the project is not modified. Use the always-visible zoom slider for exact zoom, the +/− buttons for small steps, or hold Ctrl while scrolling over a page.
+
 **Save** creates one portable `.floorplan` project containing the PDF, scale, and furniture. **Export page** makes a PNG image you can text, email, or print.
 
 Everything runs locally. Floor plans are not uploaded anywhere.
@@ -34,7 +36,9 @@ Everything runs locally. Floor plans are not uploaded anywhere.
 ## Features
 
 - Opens standard and multi-page PDF floor plans
+- Loads long PDFs a few nearby pages at a time to keep the app responsive
 - Shows all PDF pages, with continuous and two-page layouts
+- Removes unwanted pages while preserving their original PDF page numbers
 - Simple click-click calibration with feet, inches, centimeters, or meters
 - Optional one-click scale copy across every page
 - Exact rectangles and guided L-shapes
@@ -78,8 +82,8 @@ npm run dist:linux
 Push a version tag to run the included GitHub Actions release workflow:
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
 The workflow tests the app, builds the Windows, macOS, and Linux downloads, and attaches them to a GitHub Release. It can also be run manually from the repository's **Actions** tab to create test artifacts without publishing a release.

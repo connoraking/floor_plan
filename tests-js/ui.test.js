@@ -26,14 +26,20 @@ describe("visible desktop controls", () => {
     expect(document.getElementById("calibration-dialog").getAttribute("aria-labelledby")).toBe("calibration-dialog-title");
     expect(document.getElementById("calibration-cancel").textContent).toMatch(/Cancel/);
     expect(document.getElementById("calibration-all-pages").checked).toBe(false);
+    expect(document.getElementById("zoom-slider").getAttribute("min")).toBe("40");
+    expect(document.getElementById("zoom-slider").getAttribute("max")).toBe("250");
+    expect(document.getElementById("zoom-fit").textContent).toMatch(/Fit page/);
   });
 
   it("offers both continuous and two-page layouts", async () => {
     const html = await readFile(resolve(process.cwd(), "src/index.html"), "utf8");
+    const css = await readFile(resolve(process.cwd(), "src/styles.css"), "utf8");
     const document = new JSDOM(html).window.document;
     const options = [...document.querySelectorAll("#page-layout option")].map((option) => option.value);
     expect(options).toEqual(["continuous", "spread"]);
     expect(document.getElementById("page-gallery")).not.toBeNull();
     expect(document.getElementById("page-gallery").hasAttribute("aria-live")).toBe(false);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(2, max-content\)/);
+    expect(css).toMatch(/justify-content:\s*safe center/);
   });
 });

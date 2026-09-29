@@ -5,7 +5,7 @@ const electron = require("electron");
 const projectRoot = path.resolve(__dirname, "..");
 const environment = {
   ...process.env,
-  FLOOR_PLANNER_SMOKE_TEST: path.join(projectRoot, "tests-js", "fixtures", "two-page-floor-plan.pdf"),
+  FLOOR_PLANNER_SMOKE_TEST: path.join(projectRoot, "tests-js", "fixtures", "five-page-floor-plan.pdf"),
   FLOOR_PLANNER_SMOKE_SCREENSHOT: path.join(projectRoot, "tmp", "electron-smoke.png"),
 };
 delete environment.ELECTRON_RUN_AS_NODE;

@@ -18,7 +18,7 @@ describe("portable project files", () => {
       format: PROJECT_FORMAT,
       version: PROJECT_VERSION,
       pdfBase64: bytesToBase64(new Uint8Array([1, 2, 3])),
-      pages: [{ pointsPerInch: 1.5 }],
+      pages: [{ pdfPageNumber: 3, pointsPerInch: 1.5 }],
       items: [],
     };
     expect(parseProject(JSON.stringify(project))).toEqual(project);

@@ -24,11 +24,20 @@ async function runSmokeTest(window) {
     const result = await window.webContents.executeJavaScript(`
       (async () => {
         const bytes = Uint8Array.from(atob(${JSON.stringify(encodedPdf)}), (character) => character.charCodeAt(0));
-        await window.__floorPlannerTest.loadPdfBytes(bytes, "two-page-floor-plan.pdf");
+        await window.__floorPlannerTest.loadPdfBytes(bytes, "five-page-floor-plan.pdf");
 
         const layout = document.getElementById("page-layout");
         layout.value = "spread";
         layout.dispatchEvent(new Event("change", { bubbles: true }));
+
+        window.confirm = () => true;
+        document.querySelectorAll(".page-remove")[2].click();
+
+        const zoomSlider = document.getElementById("zoom-slider");
+        zoomSlider.value = "140";
+        zoomSlider.dispatchEvent(new Event("input", { bubbles: true }));
+        const zoomAfterSlider = window.__floorPlannerTest.getState().zoom;
+        document.getElementById("zoom-fit").click();
 
         document.getElementById("calibrate").click();
         const svg = document.querySelector('.page-overlay[data-page-index="0"]');
@@ -57,6 +66,7 @@ async function runSmokeTest(window) {
         const gallery = document.getElementById("page-gallery");
         return {
           ...state,
+          zoomAfterSlider,
           visiblePageCards: [...document.querySelectorAll(".page-card")].filter((node) => !node.hidden).length,
           openButtonColor: getComputedStyle(document.getElementById("open-pdf")).backgroundColor,
           calibrateButtonColor: getComputedStyle(document.getElementById("calibrate")).backgroundColor,
@@ -69,10 +79,12 @@ async function runSmokeTest(window) {
     console.log("FLOOR_PLANNER_SMOKE_STAGE interactions-complete");
 
     const failures = [];
-    if (result.pageCount !== 2 || result.visiblePageCards !== 2) failures.push("both PDF pages were not rendered");
-    if (result.calibratedPages !== 2) failures.push("calibration was not applied to both pages");
+    if (result.pageCount !== 4 || result.visiblePageCards !== 4) failures.push("five-page PDF load or page removal failed");
+    if (result.pdfPageNumbers.join(",") !== "1,2,4,5") failures.push("the wrong PDF page was removed");
+    if (result.calibratedPages !== 4) failures.push("calibration was not applied to all remaining pages");
     if (result.itemCount !== 1) failures.push("furniture could not be added");
     if (result.layout !== "spread") failures.push("two-page layout did not activate");
+    if (result.zoomAfterSlider !== 1.4) failures.push("zoom slider did not set an exact zoom level");
     if (!result.spreadFits) failures.push("two-page layout requires horizontal scrolling");
     if (!result.calibrateDialogClosed || !result.furnitureDialogClosed) failures.push("a workflow dialog did not close");
     if (result.openButtonColor === "rgba(0, 0, 0, 0)" || result.calibrateButtonColor === "rgba(0, 0, 0, 0)") {

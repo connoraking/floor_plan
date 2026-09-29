@@ -29,12 +29,6 @@
           <button id="export-png" class="button button-dark" type="button" disabled>Export page</button>
         </nav>
 
-        <div class="zoom-controls" aria-label="Zoom controls">
-          <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out">−</button>
-          <output id="zoom-value" aria-live="polite">100%</output>
-          <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in">＋</button>
-          <button id="zoom-fit" class="button button-small button-dark" type="button">Fit</button>
-        </div>
       </header>
 
       <main class="main-layout">
@@ -96,7 +90,9 @@
             <summary>Quick help</summary>
             <ul>
               <li>Click a page before calibrating or adding furniture.</li>
+              <li>Each page has its own Remove button. At least one page is always kept.</li>
               <li>Drag furniture to move it. Arrow keys make small adjustments.</li>
+              <li>Use the Zoom slider, or hold Ctrl while scrolling over a page.</li>
               <li>Use Delete to remove the selected piece.</li>
             </ul>
           </details>
@@ -104,18 +100,28 @@
 
         <section class="workspace" aria-label="Floor plan workspace">
           <div id="workspace-toolbar" class="workspace-toolbar">
-          <div>
-            <strong id="document-name">No floor plan open</strong>
-            <span id="page-count"></span>
-            <span id="active-page-status" class="sr-only" aria-live="polite"></span>
+            <div class="document-summary">
+              <strong id="document-name">No floor plan open</strong>
+              <span id="page-count"></span>
+              <span id="active-page-status" class="sr-only" aria-live="polite"></span>
             </div>
-            <label class="layout-control">
-              Page layout
-              <select id="page-layout">
-                <option value="continuous">Continuous</option>
-                <option value="spread">Two-page view</option>
-              </select>
-            </label>
+            <div class="workspace-controls">
+              <label class="layout-control">
+                Page layout
+                <select id="page-layout">
+                  <option value="continuous">Continuous</option>
+                  <option value="spread">Two-page view</option>
+                </select>
+              </label>
+              <div class="zoom-controls" aria-label="Zoom controls">
+                <span class="zoom-label">Zoom</span>
+                <button id="zoom-out" class="icon-button icon-button-light" type="button" aria-label="Zoom out">−</button>
+                <input id="zoom-slider" type="range" min="40" max="250" step="5" value="100" aria-label="Zoom percentage" />
+                <output id="zoom-value" for="zoom-slider" aria-live="polite">100%</output>
+                <button id="zoom-in" class="icon-button icon-button-light" type="button" aria-label="Zoom in">＋</button>
+                <button id="zoom-fit" class="button button-small button-secondary" type="button">Fit page</button>
+              </div>
+            </div>
           </div>
 
           <div id="drop-zone" class="drop-zone">

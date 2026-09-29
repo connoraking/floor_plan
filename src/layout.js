@@ -6,3 +6,9 @@ export function calculateSpreadFitFactor(galleryWidth, pageWidths, cssPdfScale =
   const factor = availableWidth / (widestPage * cssPdfScale * 2);
   return Math.min(1, Math.max(0.2, factor));
 }
+
+export function calculateCappedRenderScale(width, height, desiredScale, maxPixels = 10_000_000) {
+  const requestedPixels = width * height * desiredScale * desiredScale;
+  if (requestedPixels <= maxPixels) return desiredScale;
+  return desiredScale * Math.sqrt(maxPixels / requestedPixels);
+}

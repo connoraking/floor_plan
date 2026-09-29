@@ -17,35 +17,6 @@ Floor Planner is a simple Windows app for placing correctly sized furniture on a
 
 This is the only Windows program you need to download.
 
-### What if the download is a ZIP file?
-
-There are two very different ZIP files on GitHub:
-
-#### `Source code (zip)` — do not download this to use the app
-
-This contains developer files such as `src`, `electron`, and `package.json`. It does not contain an installed copy of Floor Planner. A normal user cannot click one of those files to start the app.
-
-#### `Floor-Planner-Windows.zip` — a Windows build from the Actions page
-
-This ZIP contains one usable Windows program:
-
-- `Floor-Planner-Setup-2.3.4.exe`
-
-To use it:
-
-1. Right-click **`Floor-Planner-Windows.zip`** and choose **Extract All**.
-2. Click **Extract**.
-3. Open the new extracted folder.
-4. Double-click **`Floor-Planner-Setup-2.3.4.exe`**.
-
-Do not try to run the installer while it is still inside the ZIP. Extract it first.
-
-### If Windows shows a warning
-
-The app is free and is not code-signed yet, so Windows may show **Windows protected your PC** the first time.
-
-Only when the file came from this repository, click **More info**, then **Run anyway**.
-
 ## How to use it
 
 1. Click **Open PDF** and choose your floor plan.

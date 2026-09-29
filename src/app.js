@@ -16,8 +16,13 @@ import {
   bytesToBase64,
   parseProject,
 } from "./project.js";
-import { calculateCappedRenderScale, calculateSpreadFitFactor } from "./layout.js";
+import {
+  calculateCappedRenderScale,
+  calculateContinuousFitFactor,
+  calculateSpreadFitFactor,
+} from "./layout.js";
 import { pageRecordsForProject, removePageAt } from "./pages.js";
+import { buildFlattenedPdf } from "./pdf-export.js";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -42,7 +47,7 @@ const elements = Object.fromEntries(
     "empty-open",
     "open-project",
     "save-project",
-    "export-png",
+    "export-pdf",
     "zoom-out",
     "zoom-in",
     "zoom-fit",
@@ -456,9 +461,11 @@ function evictDistantPageCanvases(referenceIndex) {
 }
 
 function updateSurfaceSizes() {
-  const spreadFactor = state.layout === "spread" ? spreadFitFactor() : 1;
   for (const page of state.pages) {
-    const width = page.width * CSS_PDF_SCALE * state.zoom * spreadFactor;
+    const layoutFactor = state.layout === "spread"
+      ? spreadFitFactor()
+      : calculateContinuousFitFactor(elements["page-gallery"].clientWidth, page.width, CSS_PDF_SCALE);
+    const width = page.width * CSS_PDF_SCALE * state.zoom * layoutFactor;
     page.surface.style.width = `${width}px`;
     page.surface.style.height = `${(width * page.height) / page.width}px`;
   }
@@ -974,7 +981,7 @@ function updateUi() {
   for (const id of ["add-rectangle", "add-l-shape"]) elements[id].disabled = !hasPdf;
   for (const preset of document.querySelectorAll(".preset")) preset.disabled = !hasPdf;
   elements["save-project"].disabled = !hasPdf;
-  elements["export-png"].disabled = !hasPdf;
+  elements["export-pdf"].disabled = !hasPdf;
   for (const id of ["zoom-out", "zoom-in", "zoom-fit", "zoom-slider"]) elements[id].disabled = !hasPdf;
 
   elements["step-open"].classList.toggle("is-complete", hasPdf);
@@ -1041,7 +1048,7 @@ async function saveProject() {
       state.projectName = `${baseName}.floorplan`;
     }
     markDirty(false);
-    showToast("Project saved. The PDF is included inside it.");
+    showToast("Editable project saved. Use Export PDF when you want a normal shareable document.");
   } catch (error) {
     showToast(`Could not save the project: ${safeErrorMessage(error, "Unknown error")}`, true);
   }
@@ -1085,49 +1092,77 @@ function downloadBlob(blob, fileName) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function exportCurrentPage() {
-  const page = activePage();
-  if (!page) return;
-  try {
-    await ensurePageRendered(page.index);
-    const output = document.createElement("canvas");
-    output.width = page.canvas.width;
-    output.height = page.canvas.height;
-    const context = output.getContext("2d");
-    context.drawImage(page.canvas, 0, 0);
+async function createPagePngDataUrl(page) {
+  await ensurePageRendered(page.index);
+  const output = document.createElement("canvas");
+  output.width = page.canvas.width;
+  output.height = page.canvas.height;
+  const context = output.getContext("2d");
+  context.drawImage(page.canvas, 0, 0);
 
-    const overlay = page.svg.cloneNode(true);
-    overlay.querySelectorAll(".is-selected").forEach((node) => node.classList.remove("is-selected"));
-    overlay.querySelectorAll(".is-temporary").forEach((node) => node.remove());
-    overlay.setAttribute("xmlns", SVG_NS);
-    overlay.setAttribute("width", String(output.width));
-    overlay.setAttribute("height", String(output.height));
-    const embeddedStyles = createSvgElement("style");
-    embeddedStyles.textContent = EXPORT_SVG_STYLES;
-    overlay.prepend(embeddedStyles);
-    const svgBlob = new Blob([new XMLSerializer().serializeToString(overlay)], { type: "image/svg+xml" });
-    const svgUrl = URL.createObjectURL(svgBlob);
-    const image = new Image();
+  const overlay = page.svg.cloneNode(true);
+  overlay.querySelectorAll(".is-selected").forEach((node) => node.classList.remove("is-selected"));
+  overlay.querySelectorAll(".is-temporary").forEach((node) => node.remove());
+  overlay.setAttribute("xmlns", SVG_NS);
+  overlay.setAttribute("width", String(output.width));
+  overlay.setAttribute("height", String(output.height));
+  const embeddedStyles = createSvgElement("style");
+  embeddedStyles.textContent = EXPORT_SVG_STYLES;
+  overlay.prepend(embeddedStyles);
+  const svgBlob = new Blob([new XMLSerializer().serializeToString(overlay)], { type: "image/svg+xml" });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  const image = new Image();
+  try {
     await new Promise((resolve, reject) => {
       image.onload = resolve;
       image.onerror = reject;
       image.src = svgUrl;
     });
     context.drawImage(image, 0, 0, output.width, output.height);
+  } finally {
     URL.revokeObjectURL(svgUrl);
-    const dataUrl = output.toDataURL("image/png");
+  }
+  return output.toDataURL("image/png");
+}
+
+async function createExportPdfBytes() {
+  const title = (state.fileName || "Floor plan").replace(/\.pdf$/i, "");
+  return buildFlattenedPdf(
+    state.pages.map((page) => ({
+      width: page.width,
+      height: page.height,
+      getPng: () => createPagePngDataUrl(page),
+    })),
+    {
+      title: `${title} - furnished`,
+      onProgress: (current, total) => {
+        elements["export-pdf"].textContent = `Exporting ${current}/${total}…`;
+      },
+    },
+  );
+}
+
+async function exportPdf() {
+  if (!state.pages.length) return;
+  const button = elements["export-pdf"];
+  button.disabled = true;
+  button.textContent = "Preparing PDF…";
+  try {
+    const pdfBytes = await createExportPdfBytes();
     const baseName = (state.fileName || "floor-plan").replace(/\.pdf$/i, "");
-    const suggestedName = `${baseName}-page-${page.pdfPageNumber}.png`;
+    const suggestedName = `${baseName}-furnished.pdf`;
     if (electronApi) {
-      const path = await electronApi.exportPng({ suggestedName, dataUrl });
+      const path = await electronApi.exportPdf({ suggestedName, data: pdfBytes });
       if (!path) return;
     } else {
-      const response = await fetch(dataUrl);
-      downloadBlob(await response.blob(), suggestedName);
+      downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), suggestedName);
     }
-    showToast(`PDF page ${page.pdfPageNumber} exported.`);
+    showToast(`Exported ${state.pages.length} page${state.pages.length === 1 ? "" : "s"} with furniture as a PDF.`);
   } catch (error) {
-    showToast(`Could not export this page: ${safeErrorMessage(error, "Unknown error")}`, true);
+    showToast(`Could not export the PDF: ${safeErrorMessage(error, "Unknown error")}`, true);
+  } finally {
+    button.textContent = "Export PDF";
+    updateUi();
   }
 }
 
@@ -1167,19 +1202,8 @@ function setZoom(nextZoom, anchor = null) {
 }
 
 function fitActivePage(allowUpscale = true) {
-  const page = activePage();
-  if (!page) return;
-  if (state.layout === "spread") {
-    setZoom(1);
-    return;
-  }
-  const galleryWidth = elements["page-gallery"].clientWidth - 72;
-  const galleryHeight = elements["page-gallery"].clientHeight - 100;
-  const fittedZoom = Math.min(
-    galleryWidth / (page.width * CSS_PDF_SCALE),
-    galleryHeight / (page.height * CSS_PDF_SCALE),
-  );
-  setZoom(allowUpscale ? fittedZoom : Math.min(1, fittedZoom));
+  if (!activePage()) return;
+  setZoom(1);
 }
 
 function handleKeyboard(event) {
@@ -1243,7 +1267,7 @@ function bindEvents() {
   for (const id of ["open-pdf", "open-pdf-side", "empty-open"]) elements[id].addEventListener("click", choosePdf);
   elements["open-project"].addEventListener("click", chooseProject);
   elements["save-project"].addEventListener("click", saveProject);
-  elements["export-png"].addEventListener("click", exportCurrentPage);
+  elements["export-pdf"].addEventListener("click", exportPdf);
   elements["pdf-file-input"].addEventListener("change", (event) => {
     readPdfFile(event.target.files[0]);
     event.target.value = "";
@@ -1351,4 +1375,5 @@ window.__floorPlannerTest = {
     pdfPageNumbers: state.pages.map((page) => page.pdfPageNumber),
   }),
   loadPdfBytes: (bytes, name = "test.pdf") => loadPdf(new Uint8Array(bytes), name),
+  createExportPdfBytes,
 };

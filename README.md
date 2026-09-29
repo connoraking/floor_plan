@@ -25,11 +25,11 @@ The downloads are currently community-built and unsigned. Windows may show a pro
 4. Click **Rectangle** for beds, tables, rugs, and regular sofas, or **L-shape** for sectionals and corner desks.
 5. Enter the real dimensions in inches, then drag the colored piece into place.
 
-Use **Page layout → Two-page view** to put two pages side by side. Continuous view keeps every page in one scrollable column. Click a piece to change its size, angle, color, name, or lock it in place.
+Use **Page layout → Two-page view** to put two pages side by side. Continuous view makes each complete page fill the workspace width in one scrollable column. In either layout, 100% zoom means fit-to-width; use the slider to make pages smaller or larger. Click a piece to change its size, angle, color, name, or lock it in place.
 
 Every page has a **Remove** button. Removing a page hides it from the project and removes furniture placed on that page; the original PDF embedded in the project is not modified. Use the always-visible zoom slider for exact zoom, the +/− buttons for small steps, or hold Ctrl while scrolling over a page.
 
-**Save** creates one portable `.floorplan` project containing the PDF, scale, and furniture. **Export page** makes a PNG image you can text, email, or print.
+**Save editable** creates one portable `.floorplan` working file containing the PDF, scale, and furniture so you can keep editing later. **Export PDF** creates a normal, shareable PDF containing every visible floor-plan page with its furniture flattened on top.
 
 Everything runs locally. Floor plans are not uploaded anywhere.
 
@@ -45,7 +45,7 @@ Everything runs locally. Floor plans are not uploaded anywhere.
 - Sofa, queen-bed, and dining-table shortcuts
 - Dragging, keyboard nudging, rotation, duplication, locking, and deletion
 - Portable project files with the source PDF embedded
-- PNG export
+- Shareable multi-page PDF export with furniture included
 - High-contrast controls and visible keyboard focus
 - Fully offline after download
 
@@ -82,8 +82,8 @@ npm run dist:linux
 Push a version tag to run the included GitHub Actions release workflow:
 
 ```bash
-git tag v2.1.0
-git push origin v2.1.0
+git tag v2.2.0
+git push origin v2.2.0
 ```
 
 The workflow tests the app, builds the Windows, macOS, and Linux downloads, and attaches them to a GitHub Release. It can also be run manually from the repository's **Actions** tab to create test artifacts without publishing a release.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateCappedRenderScale, calculateSpreadFitFactor } from "../src/layout.js";
+import {
+  calculateCappedRenderScale,
+  calculateContinuousFitFactor,
+  calculateSpreadFitFactor,
+} from "../src/layout.js";
 
 describe("two-page layout", () => {
   it.each([900, 780, 510])("fits two Letter pages inside a %ipx gallery", (galleryWidth) => {
@@ -8,8 +12,15 @@ describe("two-page layout", () => {
     expect(occupiedWidth).toBeLessThanOrEqual(galleryWidth + 0.001);
   });
 
-  it("does not enlarge small pages beyond their natural display size", () => {
-    expect(calculateSpreadFitFactor(1600, [300, 300])).toBe(1);
+  it("uses the available width even for small source pages", () => {
+    expect(calculateSpreadFitFactor(1600, [300, 300])).toBeGreaterThan(1);
+  });
+
+  it("makes a continuous page fill the available gallery width at 100%", () => {
+    const galleryWidth = 920;
+    const pageWidth = 612;
+    const factor = calculateContinuousFitFactor(galleryWidth, pageWidth);
+    expect(pageWidth * 1.12 * factor).toBeCloseTo(galleryWidth - 72);
   });
 });
 

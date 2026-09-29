@@ -24,9 +24,9 @@
           <button id="open-pdf" class="button button-primary" type="button">
             <span aria-hidden="true">＋</span> Open PDF
           </button>
+          <button id="export-pdf" class="button button-primary" type="button" disabled>Export PDF</button>
           <button id="open-project" class="button button-dark" type="button">Open project</button>
-          <button id="save-project" class="button button-dark" type="button" disabled>Save</button>
-          <button id="export-png" class="button button-dark" type="button" disabled>Export page</button>
+          <button id="save-project" class="button button-dark" type="button" title="Save an editable Floor Planner working file" disabled>Save editable</button>
         </nav>
 
       </header>
@@ -93,6 +93,7 @@
               <li>Each page has its own Remove button. At least one page is always kept.</li>
               <li>Drag furniture to move it. Arrow keys make small adjustments.</li>
               <li>Use the Zoom slider, or hold Ctrl while scrolling over a page.</li>
+              <li>Export PDF makes a shareable PDF with the furniture visible. Save editable keeps a project you can change later.</li>
               <li>Use Delete to remove the selected piece.</li>
             </ul>
           </details>
@@ -119,7 +120,7 @@
                 <input id="zoom-slider" type="range" min="40" max="250" step="5" value="100" aria-label="Zoom percentage" />
                 <output id="zoom-value" for="zoom-slider" aria-live="polite">100%</output>
                 <button id="zoom-in" class="icon-button icon-button-light" type="button" aria-label="Zoom in">＋</button>
-                <button id="zoom-fit" class="button button-small button-secondary" type="button">Fit page</button>
+                <button id="zoom-fit" class="button button-small button-secondary" type="button">Fit width</button>
               </div>
             </div>
           </div>

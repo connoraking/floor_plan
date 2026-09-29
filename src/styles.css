@@ -639,7 +639,9 @@ input[type="number"] {
 .page-gallery {
   display: grid;
   grid-template-columns: max-content;
+  grid-auto-rows: max-content;
   align-content: start;
+  align-items: start;
   justify-content: safe center;
   justify-items: stretch;
   gap: 28px;

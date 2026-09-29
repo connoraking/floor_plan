@@ -28,7 +28,9 @@ describe("visible desktop controls", () => {
     expect(document.getElementById("calibration-all-pages").checked).toBe(false);
     expect(document.getElementById("zoom-slider").getAttribute("min")).toBe("40");
     expect(document.getElementById("zoom-slider").getAttribute("max")).toBe("250");
-    expect(document.getElementById("zoom-fit").textContent).toMatch(/Fit page/);
+    expect(document.getElementById("zoom-fit").textContent).toMatch(/Fit width/);
+    expect(document.getElementById("export-pdf").textContent).toMatch(/Export PDF/);
+    expect(document.getElementById("save-project").textContent).toMatch(/Save editable/);
   });
 
   it("offers both continuous and two-page layouts", async () => {
@@ -40,6 +42,7 @@ describe("visible desktop controls", () => {
     expect(document.getElementById("page-gallery")).not.toBeNull();
     expect(document.getElementById("page-gallery").hasAttribute("aria-live")).toBe(false);
     expect(css).toMatch(/grid-template-columns:\s*repeat\(2, max-content\)/);
+    expect(css).toMatch(/grid-auto-rows:\s*max-content/);
     expect(css).toMatch(/justify-content:\s*safe center/);
   });
 });

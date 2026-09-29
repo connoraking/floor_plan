@@ -26,6 +26,15 @@ async function runSmokeTest(window) {
         const bytes = Uint8Array.from(atob(${JSON.stringify(encodedPdf)}), (character) => character.charCodeAt(0));
         await window.__floorPlannerTest.loadPdfBytes(bytes, "five-page-floor-plan.pdf");
 
+        const continuousGallery = document.getElementById("page-gallery");
+        const continuousCards = [...document.querySelectorAll(".page-card")];
+        const firstSurfaceBounds = continuousCards[0].querySelector(".pdf-surface").getBoundingClientRect();
+        const firstCardBounds = continuousCards[0].getBoundingClientRect();
+        const secondCardBounds = continuousCards[1].getBoundingClientRect();
+        const continuousPageIsFullHeight = firstSurfaceBounds.height > firstSurfaceBounds.width;
+        const continuousRowsDoNotOverlap = secondCardBounds.top > firstCardBounds.bottom + 15;
+        const continuousPageFillsWidth = firstSurfaceBounds.width >= continuousGallery.clientWidth - 80;
+
         const layout = document.getElementById("page-layout");
         layout.value = "spread";
         layout.dispatchEvent(new Event("change", { bubbles: true }));
@@ -62,10 +71,16 @@ async function runSmokeTest(window) {
         document.getElementById("furniture-depth").value = "36";
         document.getElementById("furniture-form").requestSubmit();
 
+        const exportedPdf = await window.__floorPlannerTest.createExportPdfBytes();
         const state = window.__floorPlannerTest.getState();
         const gallery = document.getElementById("page-gallery");
         return {
           ...state,
+          continuousPageIsFullHeight,
+          continuousRowsDoNotOverlap,
+          continuousPageFillsWidth,
+          exportedPdfPrefix: String.fromCharCode(...exportedPdf.slice(0, 5)),
+          exportedPdfSize: exportedPdf.length,
           zoomAfterSlider,
           visiblePageCards: [...document.querySelectorAll(".page-card")].filter((node) => !node.hidden).length,
           openButtonColor: getComputedStyle(document.getElementById("open-pdf")).backgroundColor,
@@ -80,9 +95,13 @@ async function runSmokeTest(window) {
 
     const failures = [];
     if (result.pageCount !== 4 || result.visiblePageCards !== 4) failures.push("five-page PDF load or page removal failed");
+    if (!result.continuousPageIsFullHeight || !result.continuousRowsDoNotOverlap || !result.continuousPageFillsWidth) {
+      failures.push("continuous pages were cropped instead of filling the scrollable width");
+    }
     if (result.pdfPageNumbers.join(",") !== "1,2,4,5") failures.push("the wrong PDF page was removed");
     if (result.calibratedPages !== 4) failures.push("calibration was not applied to all remaining pages");
     if (result.itemCount !== 1) failures.push("furniture could not be added");
+    if (result.exportedPdfPrefix !== "%PDF-" || result.exportedPdfSize < 1000) failures.push("furnished PDF export failed");
     if (result.layout !== "spread") failures.push("two-page layout did not activate");
     if (result.zoomAfterSlider !== 1.4) failures.push("zoom slider did not set an exact zoom level");
     if (!result.spreadFits) failures.push("two-page layout requires horizontal scrolling");
@@ -221,19 +240,20 @@ ipcMain.handle("file:save-project", async (event, { suggestedName, contents }) =
   return result.filePath;
 });
 
-ipcMain.handle("file:export-png", async (event, { suggestedName, dataUrl }) => {
+ipcMain.handle("file:export-pdf", async (event, { suggestedName, data }) => {
   requireTrustedSender(event);
-  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) {
-    throw new TypeError("Export data must be a PNG image.");
-  }
+  let pdfBuffer;
+  if (data instanceof ArrayBuffer) pdfBuffer = Buffer.from(data);
+  else if (ArrayBuffer.isView(data)) pdfBuffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  else throw new TypeError("Export data must be PDF bytes.");
+  if (pdfBuffer.subarray(0, 5).toString("ascii") !== "%PDF-") throw new TypeError("Export data is not a PDF.");
   const result = await dialog.showSaveDialog({
-    title: "Export the current page",
-    defaultPath: suggestedName || "floor-plan.png",
-    filters: [{ name: "PNG image", extensions: ["png"] }],
+    title: "Export furnished floor plan",
+    defaultPath: suggestedName || "furnished-floor-plan.pdf",
+    filters: [{ name: "PDF document", extensions: ["pdf"] }],
   });
   if (result.canceled || !result.filePath) return null;
-  const encoded = dataUrl.replace(/^data:image\/png;base64,/, "");
-  await fs.writeFile(result.filePath, Buffer.from(encoded, "base64"));
+  await fs.writeFile(result.filePath, pdfBuffer);
   return result.filePath;
 });
 

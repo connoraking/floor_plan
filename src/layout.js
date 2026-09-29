@@ -4,7 +4,12 @@ export function calculateSpreadFitFactor(galleryWidth, pageWidths, cssPdfScale =
   // 60px gallery padding + 22px column gap + 12px from both page-card borders.
   const availableWidth = Math.max(240, galleryWidth - 94);
   const factor = availableWidth / (widestPage * cssPdfScale * 2);
-  return Math.min(1, Math.max(0.2, factor));
+  return Math.max(0.2, factor);
+}
+
+export function calculateContinuousFitFactor(galleryWidth, pageWidth, cssPdfScale = 1.12) {
+  const availableWidth = Math.max(240, galleryWidth - 72);
+  return availableWidth / (pageWidth * cssPdfScale);
 }
 
 export function calculateCappedRenderScale(width, height, desiredScale, maxPixels = 10_000_000) {

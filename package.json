@@ -1,6 +1,6 @@
 {
   "name": "easy-floor-planner",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "An offline desktop app for placing true-to-size furniture on PDF floor plans.",
   "main": "electron/main.cjs",
   "type": "module",
@@ -23,9 +23,9 @@
     "test": "vitest run",
     "test:electron": "npm run build && node scripts/run-electron-smoke.cjs",
     "test:watch": "vitest",
-    "dist:win": "npm run build && electron-builder --win nsis portable --x64",
-    "dist:linux": "npm run build && electron-builder --linux AppImage --x64",
-    "dist:mac": "npm run build && electron-builder --mac dmg --universal"
+    "dist:win": "npm run build && electron-builder --win nsis portable --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg --universal --publish never"
   },
   "devDependencies": {
     "concurrently": "10.0.5",
